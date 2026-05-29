@@ -29,7 +29,7 @@ PS5 to open that local browser URL once. This avoids a stale "files exist but
 tile is not registered" state from earlier builds.
 
 Launcher state is stored in `/data/BS5fm`. The PS5 app tile itself still lives
-under `/user/app/BS5F00001`, which is the console app location used by the app
+under `/user/app/BSFM00001`, which is the console app location used by the app
 install API.
 
 The payload also shows a PS5 notification with the external browser URL when
@@ -63,7 +63,7 @@ At a high level the payload has five parts:
   notifications, refreshes the launcher tile, hands off from an older running
   BS5FileManager instance when safe, and starts the HTTP server on port `5905`.
 - `src/app_installer.c` writes the embedded launcher metadata/icon under
-  `/user/app/BS5F00001`, stores its update marker under `/data/BS5fm`, and
+  `/user/app/BSFM00001`, stores its update marker under `/data/BS5fm`, and
   registers the PS5 home-screen tile. The installer resolves the title-directory
   install function from `libSceAppInstUtil.sprx` at runtime and falls back to
   the broader app install call when needed.

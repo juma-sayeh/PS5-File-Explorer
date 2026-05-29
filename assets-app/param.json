@@ -1,5 +1,6 @@
 {
-  "titleId": "BS5F00001",
+  "applicationCategoryType": 0,
+  "titleId": "BSFM00001",
   "deeplinkUri": "http://127.0.0.1:5905/",
   "localizedParameters": {
     "defaultLanguage": "en-US",

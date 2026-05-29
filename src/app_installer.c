@@ -15,12 +15,13 @@
 #include "app_installer.h"
 #include "notify.h"
 
-#define BS5FM_APP_TITLE_ID "BS5F00001"
+#define BS5FM_APP_TITLE_ID "BSFM00001"
+#define BS5FM_LEGACY_APP_TITLE_ID "BS5F00001"
 #define BS5FM_APP_ROOT "/user/app"
 #define BS5FM_APP_PARENT BS5FM_APP_ROOT "/"
 #define BS5FM_DATA_DIR "/data/BS5fm"
 #define BS5FM_MARKER_PATH BS5FM_DATA_DIR "/launcher.ok"
-#define BS5FM_INSTALL_MARKER "bs5filemanager-launcher-v4\n"
+#define BS5FM_INSTALL_MARKER "bs5filemanager-launcher-v5\n"
 
 #define INCASSET(name, file)                                                   \
   __asm__(".section .rodata\n"                                                 \
@@ -127,6 +128,7 @@ bs5fm_install_app_if_needed(void) {
   char sce_sys_dir[256];
   char param_path[256];
   char icon_path[256];
+  char msg[128];
   struct stat st;
 
   snprintf(app_dir, sizeof(app_dir), BS5FM_APP_ROOT "/%s", BS5FM_APP_TITLE_ID);
@@ -154,30 +156,40 @@ bs5fm_install_app_if_needed(void) {
   int err = sceAppInstUtilInitialize();
   if(err) {
     printf("  launcher install: sceAppInstUtilInitialize failed 0x%08x\n", err);
+    snprintf(msg, sizeof(msg), "AppInst init failed 0x%08x", err);
+    bs5fm_notify("BS5FileManager app failed", msg);
     return -1;
   }
 
   int uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_APP_TITLE_ID);
   printf("  launcher install: refresh old tile 0x%08x\n", uninstall_err);
+  uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_LEGACY_APP_TITLE_ID);
+  printf("  launcher install: remove legacy tile 0x%08x\n", uninstall_err);
 
   if(mkdir_if_needed(app_dir) != 0 || mkdir_if_needed(sce_sys_dir) != 0) {
     printf("  launcher install: mkdir failed errno %d\n", errno);
+    snprintf(msg, sizeof(msg), "mkdir failed errno %d", errno);
+    bs5fm_notify("BS5FileManager app failed", msg);
     return -1;
   }
 
   if(write_file(param_path, bs5fm_param_json, bs5fm_param_json_size) != 0) {
     printf("  launcher install: failed writing %s\n", param_path);
+    bs5fm_notify("BS5FileManager app failed", "could not write param.json");
     return -1;
   }
 
   if(write_file(icon_path, bs5fm_icon0_png, bs5fm_icon0_png_size) != 0) {
     printf("  launcher install: failed writing %s\n", icon_path);
+    bs5fm_notify("BS5FileManager app failed", "could not write icon0.png");
     return -1;
   }
 
   err = install_app(BS5FM_APP_TITLE_ID, BS5FM_APP_PARENT);
   if(err) {
     printf("  launcher install: install_app failed 0x%08x\n", err);
+    snprintf(msg, sizeof(msg), "register BSFM00001 failed 0x%08x", err);
+    bs5fm_notify("BS5FileManager app failed", msg);
     return -1;
   }
 
@@ -191,6 +203,6 @@ bs5fm_install_app_if_needed(void) {
   }
 
   bs5fm_notify("BS5FileManager app ready",
-               "Tile opens http://127.0.0.1:5905/");
+               "Tile BSFM00001 opens http://127.0.0.1:5905/");
   return 1;
 }
