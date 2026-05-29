@@ -25,10 +25,12 @@
 
 
 #define HEADER_MAX 65536
+#define CONTROL_TOKEN "bs5fm-local-reload"
 
 
 static int             g_websrv_srvfd = -1;
 static pthread_mutex_t g_websrv_lock = PTHREAD_MUTEX_INITIALIZER;
+static volatile sig_atomic_t g_websrv_exit_requested = 0;
 
 
 static const char *
@@ -102,6 +104,27 @@ int
 websrv_send_text(int fd, int status, const char *mime, const char *body) {
   return websrv_send(fd, status, mime, body ? body : "",
                      body ? strlen(body) : 0);
+}
+
+
+void
+websrv_request_exit(void) {
+  pthread_mutex_lock(&g_websrv_lock);
+  g_websrv_exit_requested = 1;
+  int srvfd = g_websrv_srvfd;
+  g_websrv_srvfd = -1;
+  pthread_mutex_unlock(&g_websrv_lock);
+
+  if(srvfd >= 0) {
+    shutdown(srvfd, SHUT_RDWR);
+    close(srvfd);
+  }
+}
+
+
+int
+websrv_exit_requested(void) {
+  return g_websrv_exit_requested ? 1 : 0;
 }
 
 
@@ -265,6 +288,22 @@ status_request(const http_request_t *req) {
 
 
 static int
+shutdown_request(const http_request_t *req) {
+  char token[64];
+  if(!websrv_get_query_arg(req, "token", token, sizeof(token)) ||
+     strcmp(token, CONTROL_TOKEN) != 0) {
+    return websrv_send_error_json(req->fd, 403, "forbidden");
+  }
+
+  const char body[] = "{\"ok\":true,\"shutdown\":true}";
+  int rc = websrv_send(req->fd, 200, "application/json",
+                       body, sizeof(body) - 1);
+  websrv_request_exit();
+  return rc;
+}
+
+
+static int
 dispatch_request(const http_request_t *req, const char *initial_body,
                  size_t initial_size, size_t content_size) {
   if(!strcmp(req->method, "GET") || !strcmp(req->method, "HEAD")) {
@@ -274,6 +313,9 @@ dispatch_request(const http_request_t *req, const char *initial_body,
     }
     if(!strcmp(req->path, "/api/status") || !strcmp(req->path, "/api/version")) {
       return status_request(req);
+    }
+    if(!strcmp(req->path, "/api/control/shutdown")) {
+      return shutdown_request(req);
     }
     if(!strcmp(req->path, "/fs") || !strncmp(req->path, "/fs/", 4)) {
       return fs_request(req, req->path);
@@ -420,9 +462,12 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
 
   if(ready_cb) ready_cb(port, ready_arg);
 
-  while(1) {
+  while(!g_websrv_exit_requested) {
     int connfd = accept(srvfd, NULL, NULL);
     if(connfd < 0) {
+      if(g_websrv_exit_requested) {
+        return -ECANCELED;
+      }
       if(errno == EINTR || errno == ECONNABORTED || errno == ECONNRESET) {
         continue;
       }

@@ -24,9 +24,9 @@ On first run, the payload installs or updates a PS5 home-screen tile named
 http://127.0.0.1:5905/
 ```
 
-When the launcher is newly installed or updated, the payload also asks the PS5
-to open that local browser URL once. Later loads keep the tile available without
-forcing the browser open again.
+On each injection, the payload refreshes the launcher registration and asks the
+PS5 to open that local browser URL once. This avoids a stale "files exist but
+tile is not registered" state from earlier builds.
 
 Launcher state is stored in `/data/BS5fm`. The PS5 app tile itself still lives
 under `/user/app/BS5F00001`, which is the console app location used by the app
@@ -60,8 +60,8 @@ stay lightweight and do not recursively scan every visible folder.
 At a high level the payload has five parts:
 
 - `src/lite_main.c` starts the payload, detects the LAN IP, sends startup
-  notifications, installs the launcher tile if needed, and starts the HTTP
-  server on port `5905`.
+  notifications, refreshes the launcher tile, hands off from an older running
+  BS5FileManager instance when safe, and starts the HTTP server on port `5905`.
 - `src/app_installer.c` writes the embedded launcher metadata/icon under
   `/user/app/BS5F00001`, stores its update marker under `/data/BS5fm`, and
   registers the PS5 home-screen tile. The installer resolves the title-directory
@@ -113,8 +113,12 @@ make deploy PS5_HOST=<PS5_IP> PS5_PORT=9021
 ## Safety Notes
 
 BS5FileManager avoids forced process unloads and kernel-level cleanup. If an
-older payload is still running, this build does not interact with it; it uses
-port `5905` instead.
+older BS5FileManager instance is still running, reinjection first checks whether
+a file operation is active. If idle, it asks the old instance to shut down and
+falls back to stopping that old userland process by PID only if the old build
+does not support the clean shutdown endpoint. If a copy, move, or delete job is
+busy, the new injection exits after refreshing the launcher instead of killing
+the active job.
 
 Recursive folder size, copy, move, and delete can still take time on very large
 external drives. Progress polling is tolerant of short hiccups, and active jobs

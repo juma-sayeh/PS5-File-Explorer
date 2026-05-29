@@ -36,3 +36,7 @@ void websrv_url_decode(char *out, size_t out_size, const char *in);
 
 int websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
                   void *ready_arg);
+
+void websrv_request_exit(void);
+
+int websrv_exit_requested(void);

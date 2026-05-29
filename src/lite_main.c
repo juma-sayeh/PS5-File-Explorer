@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>
@@ -23,6 +26,7 @@
 #include "websrv.h"
 
 #define BS5FM_WEB_PORT 5905
+#define BS5FM_RELOAD_TOKEN "bs5fm-local-reload"
 
 int sceNetCtlInit(void);
 int sceSystemServiceLaunchWebBrowser(const char *uri, void *);
@@ -69,6 +73,150 @@ init_ps5_services(void) {
 
   err = sceUserServiceInitialize(&user_prio);
   printf("  service: sceUserServiceInitialize 0x%08x\n", err);
+}
+
+
+static int
+local_http_get(const char *path, char *out, size_t out_size) {
+  if(out_size == 0) return -1;
+  out[0] = 0;
+
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  if(fd < 0) return -1;
+
+  struct timeval timeout;
+  timeout.tv_sec = 1;
+  timeout.tv_usec = 0;
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(BS5FM_WEB_PORT);
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+  if(connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+    close(fd);
+    return -1;
+  }
+
+  char request[256];
+  int n = snprintf(request, sizeof(request),
+                   "GET %s HTTP/1.1\r\n"
+                   "Host: 127.0.0.1:%u\r\n"
+                   "Connection: close\r\n"
+                   "\r\n",
+                   path, (unsigned int)BS5FM_WEB_PORT);
+  if(n < 0 || (size_t)n >= sizeof(request) ||
+     websrv_write_all(fd, request, (size_t)n) != 0) {
+    close(fd);
+    return -1;
+  }
+
+  size_t used = 0;
+  while(used + 1 < out_size) {
+    ssize_t r = recv(fd, out + used, out_size - used - 1, 0);
+    if(r < 0) {
+      if(errno == EINTR) continue;
+      break;
+    }
+    if(r == 0) break;
+    used += (size_t)r;
+  }
+  out[used] = 0;
+  close(fd);
+
+  return used > 0 ? 0 : -1;
+}
+
+
+static long
+json_long_field(const char *json, const char *field) {
+  char needle[64];
+  snprintf(needle, sizeof(needle), "\"%s\":", field);
+
+  const char *p = strstr(json ? json : "", needle);
+  if(!p) return -1;
+  p += strlen(needle);
+  while(*p == ' ' || *p == '\t') p++;
+
+  char *end = NULL;
+  long value = strtol(p, &end, 10);
+  return end && end != p ? value : -1;
+}
+
+
+static int
+old_server_busy(void) {
+  char response[2048];
+  if(local_http_get("/api/fs/job/status", response, sizeof(response)) != 0) {
+    return 0;
+  }
+  return strstr(response, "\"busy\":true") != NULL;
+}
+
+
+static int
+wait_for_old_server_down(void) {
+  char response[512];
+  for(int i = 0; i < 30; i++) {
+    if(local_http_get("/api/status", response, sizeof(response)) != 0) {
+      return 1;
+    }
+    usleep(100000);
+  }
+  return 0;
+}
+
+
+static int
+handoff_existing_server(void) {
+  char response[2048];
+  if(local_http_get("/api/status", response, sizeof(response)) != 0) {
+    return 0;
+  }
+  if(!strstr(response, "\"name\":\"BS5FileManager\"")) {
+    return 0;
+  }
+
+  long old_pid = json_long_field(response, "pid");
+  if(old_pid <= 0 || old_pid == (long)getpid()) {
+    return 0;
+  }
+
+  if(old_server_busy()) {
+    bs5fm_notify("BS5FileManager reload skipped",
+                 "Old file operation is still running");
+    return -1;
+  }
+
+  snprintf(response, sizeof(response),
+           "/api/control/shutdown?token=%s", BS5FM_RELOAD_TOKEN);
+  char shutdown_response[512];
+  if(local_http_get(response, shutdown_response,
+                    sizeof(shutdown_response)) == 0 &&
+     strstr(shutdown_response, "200 OK") &&
+     strstr(shutdown_response, "\"ok\":true") &&
+     wait_for_old_server_down()) {
+    bs5fm_notify("BS5FileManager reloaded", "Old listener stopped cleanly");
+    return 1;
+  }
+
+  if(kill((pid_t)old_pid, SIGTERM) == 0 && wait_for_old_server_down()) {
+    bs5fm_notify("BS5FileManager reloaded", "Old listener stopped");
+    return 1;
+  }
+
+  kill((pid_t)old_pid, SIGKILL);
+  if(wait_for_old_server_down()) {
+    bs5fm_notify("BS5FileManager reloaded", "Old listener was replaced");
+    return 1;
+  }
+
+  bs5fm_notify("BS5FileManager reload failed",
+               "Could not stop old listener on port 5905");
+  return -1;
 }
 
 
@@ -133,13 +281,24 @@ main(int argc, char **argv) {
   int app_install_status = bs5fm_install_app_if_needed();
   if(app_install_status >= 0) {
     puts("  ps5 app: ready");
-    ready.launch_browser = app_install_status > 0;
+    ready.launch_browser = 1;
   } else {
     puts("  ps5 app: install failed, continuing web server");
+    ready.launch_browser = 1;
+  }
+
+  int handoff_status = handoff_existing_server();
+  if(handoff_status < 0) {
+    puts("  reload: old listener still active; exiting this injection");
+    return 0;
   }
 
   while(1) {
     int rc = websrv_listen(BS5FM_WEB_PORT, on_web_ready, &ready);
+    if(websrv_exit_requested()) {
+      puts("  web ui: shutdown requested");
+      break;
+    }
     if(!ready.notified) {
       char msg[128];
       snprintf(msg, sizeof(msg), "port %u error %d, retrying",

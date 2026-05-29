@@ -20,7 +20,7 @@
 #define BS5FM_APP_PARENT BS5FM_APP_ROOT "/"
 #define BS5FM_DATA_DIR "/data/BS5fm"
 #define BS5FM_MARKER_PATH BS5FM_DATA_DIR "/launcher.ok"
-#define BS5FM_INSTALL_MARKER "bs5filemanager-launcher-v3\n"
+#define BS5FM_INSTALL_MARKER "bs5filemanager-launcher-v4\n"
 
 #define INCASSET(name, file)                                                   \
   __asm__(".section .rodata\n"                                                 \
@@ -39,6 +39,7 @@ INCASSET(bs5fm_icon0_png, "assets-app/icon0.png");
 
 int sceAppInstUtilInitialize(void);
 int sceAppInstUtilAppInstallAll(void *);
+int sceAppInstUtilAppInstallTitleDir(const char *, const char *, void *);
 int sceAppInstUtilAppUnInstall(const char *);
 
 typedef int (*app_install_title_dir_fn)(const char *, const char *, void *);
@@ -48,17 +49,21 @@ static const uint8_t g_install_marker[] = BS5FM_INSTALL_MARKER;
 
 static int
 install_app(const char *title_id, const char *dir) {
-  app_install_title_dir_fn sceAppInstUtilAppInstallTitleDir = NULL;
+  app_install_title_dir_fn resolved_install = NULL;
   uint32_t handle = 0;
+  int err = sceAppInstUtilAppInstallTitleDir(title_id, dir, NULL);
+  if(err == 0) return 0;
+
+  printf("  launcher install: direct AppInstallTitleDir failed 0x%08x\n", err);
 
   if(kernel_dynlib_handle(-1, "libSceAppInstUtil.sprx", &handle) == 0) {
-    sceAppInstUtilAppInstallTitleDir =
+    resolved_install =
         (app_install_title_dir_fn)kernel_dynlib_resolve(-1, handle,
                                                         "Wudg3Xe3heE");
   }
 
-  if(sceAppInstUtilAppInstallTitleDir) {
-    return sceAppInstUtilAppInstallTitleDir(title_id, dir, NULL);
+  if(resolved_install) {
+    return resolved_install(title_id, dir, NULL);
   }
 
   return sceAppInstUtilAppInstallAll(NULL);
@@ -130,18 +135,18 @@ bs5fm_install_app_if_needed(void) {
   snprintf(icon_path, sizeof(icon_path), "%s/icon0.png", sce_sys_dir);
 
   int app_exists = stat(app_dir, &st) == 0;
-  int needs_install = !app_exists ||
-                      file_differs(param_path, bs5fm_param_json,
-                                   bs5fm_param_json_size) ||
-                      file_differs(icon_path, bs5fm_icon0_png,
-                                   bs5fm_icon0_png_size) ||
-                      file_differs(BS5FM_MARKER_PATH, g_install_marker,
-                                   sizeof(g_install_marker) - 1);
+  int assets_changed = !app_exists ||
+                       file_differs(param_path, bs5fm_param_json,
+                                    bs5fm_param_json_size) ||
+                       file_differs(icon_path, bs5fm_icon0_png,
+                                    bs5fm_icon0_png_size) ||
+                       file_differs(BS5FM_MARKER_PATH, g_install_marker,
+                                    sizeof(g_install_marker) - 1);
 
-  if(!needs_install) return 0;
-
-  if(stat(app_dir, &st) == 0) {
+  if(app_exists && assets_changed) {
     bs5fm_notify("BS5FileManager app", "Updating PS5 home-screen launcher");
+  } else if(app_exists) {
+    bs5fm_notify("BS5FileManager app", "Refreshing PS5 home-screen launcher");
   } else {
     bs5fm_notify("BS5FileManager app", "Installing PS5 home-screen launcher");
   }
@@ -152,10 +157,8 @@ bs5fm_install_app_if_needed(void) {
     return -1;
   }
 
-  if(app_exists) {
-    int uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_APP_TITLE_ID);
-    printf("  launcher install: refresh old tile 0x%08x\n", uninstall_err);
-  }
+  int uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_APP_TITLE_ID);
+  printf("  launcher install: refresh old tile 0x%08x\n", uninstall_err);
 
   if(mkdir_if_needed(app_dir) != 0 || mkdir_if_needed(sce_sys_dir) != 0) {
     printf("  launcher install: mkdir failed errno %d\n", errno);
