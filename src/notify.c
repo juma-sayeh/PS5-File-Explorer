@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - PS5 notification helpers.
+ * BFpilot - PS5 notification helpers.
  */
 
 #include <stdbool.h>
@@ -39,9 +39,9 @@ notify_debug(const char *message, const char *submessage) {
 
 
 void
-bs5fm_notify(const char *message, const char *submessage) {
+bfpilot_notify(const char *message, const char *submessage) {
   char payload[4096];
-  const char *msg = message ? message : "BS5FileManager";
+  const char *msg = message ? message : "BFpilot";
   const char *sub = submessage ? submessage : "";
 
   snprintf(payload, sizeof(payload),

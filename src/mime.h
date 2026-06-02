@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - MIME lookup.
+ * BFpilot - MIME lookup.
  */
 
 #pragma once

@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - file-manager API.
+ * BFpilot - file-manager API.
  */
 
 #pragma once

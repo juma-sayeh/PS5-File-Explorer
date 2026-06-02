@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - tiny HTTP server helpers.
+ * BFpilot - tiny HTTP server helpers.
  */
 
 #pragma once

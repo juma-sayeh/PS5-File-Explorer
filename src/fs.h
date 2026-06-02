@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - direct file serving helpers.
+ * BFpilot - direct file serving helpers.
  */
 
 #pragma once

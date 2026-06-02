@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - file-manager copy/move/delete primitives and API.
+ * BFpilot - file-manager copy/move/delete primitives and API.
  */
 
 #include <ctype.h>

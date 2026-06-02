@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - install the PS5 home-screen web launcher tile.
+ * BFpilot - install the PS5 home-screen web launcher tile.
  */
 
 #include <errno.h>
@@ -15,13 +15,14 @@
 #include "app_installer.h"
 #include "notify.h"
 
-#define BS5FM_APP_TITLE_ID "BSFM00001"
-#define BS5FM_LEGACY_APP_TITLE_ID "BS5F00001"
-#define BS5FM_APP_ROOT "/user/app"
-#define BS5FM_APP_PARENT BS5FM_APP_ROOT "/"
-#define BS5FM_DATA_DIR "/data/BS5fm"
-#define BS5FM_MARKER_PATH BS5FM_DATA_DIR "/launcher.ok"
-#define BS5FM_INSTALL_MARKER "bs5filemanager-launcher-v5\n"
+#define BFPILOT_APP_TITLE_ID "BFPILOT01"
+#define BFPILOT_LEGACY_APP_TITLE_ID "BSFM00001"
+#define BFPILOT_OLD_LEGACY_APP_TITLE_ID "BS5F00001"
+#define BFPILOT_APP_ROOT "/user/app"
+#define BFPILOT_APP_PARENT BFPILOT_APP_ROOT "/"
+#define BFPILOT_DATA_DIR "/data/BFpilot"
+#define BFPILOT_MARKER_PATH BFPILOT_DATA_DIR "/launcher.ok"
+#define BFPILOT_INSTALL_MARKER "bfpilot-launcher-v1\n"
 
 #define INCASSET(name, file)                                                   \
   __asm__(".section .rodata\n"                                                 \
@@ -35,8 +36,8 @@
   extern const uint8_t name[];                                                 \
   extern const size_t name##_size
 
-INCASSET(bs5fm_param_json, "assets-app/param.json");
-INCASSET(bs5fm_icon0_png, "assets-app/icon0.png");
+INCASSET(bfpilot_param_json, "assets-app/param.json");
+INCASSET(bfpilot_icon0_png, "assets-app/icon0.png");
 
 int sceAppInstUtilInitialize(void);
 int sceAppInstUtilAppInstallAll(void *);
@@ -45,7 +46,7 @@ int sceAppInstUtilAppUnInstall(const char *);
 
 typedef int (*app_install_title_dir_fn)(const char *, const char *, void *);
 
-static const uint8_t g_install_marker[] = BS5FM_INSTALL_MARKER;
+static const uint8_t g_install_marker[] = BFPILOT_INSTALL_MARKER;
 
 
 static int
@@ -118,12 +119,12 @@ mkdir_if_needed(const char *path) {
 static int
 ensure_data_dir(void) {
   if(mkdir_if_needed("/data") != 0) return -1;
-  return mkdir_if_needed(BS5FM_DATA_DIR);
+  return mkdir_if_needed(BFPILOT_DATA_DIR);
 }
 
 
 int
-bs5fm_install_app_if_needed(void) {
+bfpilot_install_app_if_needed(void) {
   char app_dir[256];
   char sce_sys_dir[256];
   char param_path[256];
@@ -131,78 +132,82 @@ bs5fm_install_app_if_needed(void) {
   char msg[128];
   struct stat st;
 
-  snprintf(app_dir, sizeof(app_dir), BS5FM_APP_ROOT "/%s", BS5FM_APP_TITLE_ID);
+  snprintf(app_dir, sizeof(app_dir), BFPILOT_APP_ROOT "/%s",
+           BFPILOT_APP_TITLE_ID);
   snprintf(sce_sys_dir, sizeof(sce_sys_dir), "%s/sce_sys", app_dir);
   snprintf(param_path, sizeof(param_path), "%s/param.json", sce_sys_dir);
   snprintf(icon_path, sizeof(icon_path), "%s/icon0.png", sce_sys_dir);
 
   int app_exists = stat(app_dir, &st) == 0;
   int assets_changed = !app_exists ||
-                       file_differs(param_path, bs5fm_param_json,
-                                    bs5fm_param_json_size) ||
-                       file_differs(icon_path, bs5fm_icon0_png,
-                                    bs5fm_icon0_png_size) ||
-                       file_differs(BS5FM_MARKER_PATH, g_install_marker,
-                                    sizeof(g_install_marker) - 1);
+                       file_differs(param_path, bfpilot_param_json,
+                                    bfpilot_param_json_size) ||
+                       file_differs(icon_path, bfpilot_icon0_png,
+                                    bfpilot_icon0_png_size) ||
+                       file_differs(BFPILOT_MARKER_PATH, g_install_marker,
+                                     sizeof(g_install_marker) - 1);
 
   if(app_exists && assets_changed) {
-    bs5fm_notify("BS5FileManager app", "Updating PS5 home-screen launcher");
+    bfpilot_notify("BFpilot app", "Updating PS5 home-screen launcher");
   } else if(app_exists) {
-    bs5fm_notify("BS5FileManager app", "Refreshing PS5 home-screen launcher");
+    bfpilot_notify("BFpilot app", "Refreshing PS5 home-screen launcher");
   } else {
-    bs5fm_notify("BS5FileManager app", "Installing PS5 home-screen launcher");
+    bfpilot_notify("BFpilot app", "Installing PS5 home-screen launcher");
   }
 
   int err = sceAppInstUtilInitialize();
   if(err) {
     printf("  launcher install: sceAppInstUtilInitialize failed 0x%08x\n", err);
     snprintf(msg, sizeof(msg), "AppInst init failed 0x%08x", err);
-    bs5fm_notify("BS5FileManager app failed", msg);
+    bfpilot_notify("BFpilot app failed", msg);
     return -1;
   }
 
-  int uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_APP_TITLE_ID);
-  printf("  launcher install: refresh old tile 0x%08x\n", uninstall_err);
-  uninstall_err = sceAppInstUtilAppUnInstall(BS5FM_LEGACY_APP_TITLE_ID);
-  printf("  launcher install: remove legacy tile 0x%08x\n", uninstall_err);
+  int uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_APP_TITLE_ID);
+  printf("  launcher install: refresh BFpilot tile 0x%08x\n", uninstall_err);
+  uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_LEGACY_APP_TITLE_ID);
+  printf("  launcher install: remove BS5FileManager tile 0x%08x\n",
+         uninstall_err);
+  uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_OLD_LEGACY_APP_TITLE_ID);
+  printf("  launcher install: remove old legacy tile 0x%08x\n", uninstall_err);
 
   if(mkdir_if_needed(app_dir) != 0 || mkdir_if_needed(sce_sys_dir) != 0) {
     printf("  launcher install: mkdir failed errno %d\n", errno);
     snprintf(msg, sizeof(msg), "mkdir failed errno %d", errno);
-    bs5fm_notify("BS5FileManager app failed", msg);
+    bfpilot_notify("BFpilot app failed", msg);
     return -1;
   }
 
-  if(write_file(param_path, bs5fm_param_json, bs5fm_param_json_size) != 0) {
+  if(write_file(param_path, bfpilot_param_json, bfpilot_param_json_size) != 0) {
     printf("  launcher install: failed writing %s\n", param_path);
-    bs5fm_notify("BS5FileManager app failed", "could not write param.json");
+    bfpilot_notify("BFpilot app failed", "could not write param.json");
     return -1;
   }
 
-  if(write_file(icon_path, bs5fm_icon0_png, bs5fm_icon0_png_size) != 0) {
+  if(write_file(icon_path, bfpilot_icon0_png, bfpilot_icon0_png_size) != 0) {
     printf("  launcher install: failed writing %s\n", icon_path);
-    bs5fm_notify("BS5FileManager app failed", "could not write icon0.png");
+    bfpilot_notify("BFpilot app failed", "could not write icon0.png");
     return -1;
   }
 
-  err = install_app(BS5FM_APP_TITLE_ID, BS5FM_APP_PARENT);
+  err = install_app(BFPILOT_APP_TITLE_ID, BFPILOT_APP_PARENT);
   if(err) {
     printf("  launcher install: install_app failed 0x%08x\n", err);
-    snprintf(msg, sizeof(msg), "register BSFM00001 failed 0x%08x", err);
-    bs5fm_notify("BS5FileManager app failed", msg);
+    snprintf(msg, sizeof(msg), "register BFPILOT01 failed 0x%08x", err);
+    bfpilot_notify("BFpilot app failed", msg);
     return -1;
   }
 
   if(ensure_data_dir() != 0) {
     printf("  launcher install: warning, failed creating %s errno %d\n",
-           BS5FM_DATA_DIR, errno);
-  } else if(write_file(BS5FM_MARKER_PATH, g_install_marker,
-                sizeof(g_install_marker) - 1) != 0) {
+           BFPILOT_DATA_DIR, errno);
+  } else if(write_file(BFPILOT_MARKER_PATH, g_install_marker,
+                 sizeof(g_install_marker) - 1) != 0) {
     printf("  launcher install: warning, failed writing %s\n",
-           BS5FM_MARKER_PATH);
+           BFPILOT_MARKER_PATH);
   }
 
-  bs5fm_notify("BS5FileManager app ready",
-               "Tile BSFM00001 opens http://127.0.0.1:5905/");
+  bfpilot_notify("BFpilot app ready",
+                 "Tile BFPILOT01 opens http://127.0.0.1:5905/");
   return 1;
 }

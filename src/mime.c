@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - small MIME helper for direct downloads.
+ * BFpilot - small MIME helper for direct downloads.
  *
  * The UI only needs enough types for browser previews and common archives.
  * Unknown extensions fall back to application/octet-stream in the caller.

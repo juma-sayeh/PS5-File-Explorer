@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - embedded static assets.
+ * BFpilot - embedded static assets.
  */
 
 #include <limits.h>

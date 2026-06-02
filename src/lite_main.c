@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - minimal PS5 browser file manager payload.
+ * BFpilot - minimal PS5 browser file manager payload.
  *
  * Runtime surface is intentionally small: one HTTP file-manager server,
  * startup notification, and no companion side services.
@@ -25,8 +25,8 @@
 #include "version.h"
 #include "websrv.h"
 
-#define BS5FM_WEB_PORT 5905
-#define BS5FM_RELOAD_TOKEN "bs5fm-local-reload"
+#define BFPILOT_WEB_PORT 5905
+#define BFPILOT_RELOAD_TOKEN "bs5fm-local-reload"
 
 int sceNetCtlInit(void);
 int sceUserServiceInitialize(void *);
@@ -90,7 +90,7 @@ local_http_get(const char *path, char *out, size_t out_size) {
   struct sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(BS5FM_WEB_PORT);
+  addr.sin_port = htons(BFPILOT_WEB_PORT);
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
   if(connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
@@ -104,7 +104,7 @@ local_http_get(const char *path, char *out, size_t out_size) {
                    "Host: 127.0.0.1:%u\r\n"
                    "Connection: close\r\n"
                    "\r\n",
-                   path, (unsigned int)BS5FM_WEB_PORT);
+                   path, (unsigned int)BFPILOT_WEB_PORT);
   if(n < 0 || (size_t)n >= sizeof(request) ||
      websrv_write_all(fd, request, (size_t)n) != 0) {
     close(fd);
@@ -173,7 +173,8 @@ handoff_existing_server(void) {
   if(local_http_get("/api/status", response, sizeof(response)) != 0) {
     return 0;
   }
-  if(!strstr(response, "\"name\":\"BS5FileManager\"")) {
+  if(!strstr(response, "\"name\":\"BFpilot\"") &&
+     !strstr(response, "\"name\":\"BS5FileManager\"")) {
     return 0;
   }
 
@@ -183,36 +184,36 @@ handoff_existing_server(void) {
   }
 
   if(old_server_busy()) {
-    bs5fm_notify("BS5FileManager reload skipped",
-                 "Old file operation is still running");
+    bfpilot_notify("BFpilot reload skipped",
+                   "Old file operation is still running");
     return -1;
   }
 
   snprintf(response, sizeof(response),
-           "/api/control/shutdown?token=%s", BS5FM_RELOAD_TOKEN);
+           "/api/control/shutdown?token=%s", BFPILOT_RELOAD_TOKEN);
   char shutdown_response[512];
   if(local_http_get(response, shutdown_response,
                     sizeof(shutdown_response)) == 0 &&
      strstr(shutdown_response, "200 OK") &&
      strstr(shutdown_response, "\"ok\":true") &&
      wait_for_old_server_down()) {
-    bs5fm_notify("BS5FileManager reloaded", "Old listener stopped cleanly");
+    bfpilot_notify("BFpilot reloaded", "Old listener stopped cleanly");
     return 1;
   }
 
   if(kill((pid_t)old_pid, SIGTERM) == 0 && wait_for_old_server_down()) {
-    bs5fm_notify("BS5FileManager reloaded", "Old listener stopped");
+    bfpilot_notify("BFpilot reloaded", "Old listener stopped");
     return 1;
   }
 
   kill((pid_t)old_pid, SIGKILL);
   if(wait_for_old_server_down()) {
-    bs5fm_notify("BS5FileManager reloaded", "Old listener was replaced");
+    bfpilot_notify("BFpilot reloaded", "Old listener was replaced");
     return 1;
   }
 
-  bs5fm_notify("BS5FileManager reload failed",
-               "Could not stop old listener on port 5905");
+  bfpilot_notify("BFpilot reload failed",
+                 "Could not stop old listener on port 5905");
   return -1;
 }
 
@@ -228,7 +229,7 @@ on_web_ready(unsigned short port, void *arg) {
   printf("  web ui ready: http://%s:%u/\n", state->ip, (unsigned int)port);
 
   if(!state->notified) {
-    bs5fm_notify("BS5FileManager started", url);
+    bfpilot_notify("BFpilot started", url);
     state->notified = 1;
   }
 }
@@ -244,14 +245,14 @@ main(int argc, char **argv) {
   detect_lan_ip(ready.ip, sizeof(ready.ip));
 
   puts(".----------------------------------------------.");
-  puts("|  BS5FileManager                              |");
+  puts("|  BFpilot                                     |");
   printf("|  %-18s  browser file manager        |\n", VERSION_TAG);
   puts("'----------------------------------------------'");
   puts("");
   puts("  active: standalone web file manager");
   puts("  scope: browse, upload, download, copy, move, delete, rename, mkdir");
-  puts("  ps5 app: BS5FileManager opens http://127.0.0.1:5905/");
-  printf("  web ui: http://%s:%u/\n", ready.ip, (unsigned int)BS5FM_WEB_PORT);
+  puts("  ps5 app: BFpilot opens http://127.0.0.1:5905/");
+  printf("  web ui: http://%s:%u/\n", ready.ip, (unsigned int)BFPILOT_WEB_PORT);
   puts("  inject/deploy port: 9021");
   puts("");
 
@@ -260,7 +261,7 @@ main(int argc, char **argv) {
 
   init_ps5_services();
 
-  int app_install_status = bs5fm_install_app_if_needed();
+  int app_install_status = bfpilot_install_app_if_needed();
   if(app_install_status >= 0) {
     puts("  ps5 app: ready");
   } else {
@@ -274,7 +275,7 @@ main(int argc, char **argv) {
   }
 
   while(1) {
-    int rc = websrv_listen(BS5FM_WEB_PORT, on_web_ready, &ready);
+    int rc = websrv_listen(BFPILOT_WEB_PORT, on_web_ready, &ready);
     if(websrv_exit_requested()) {
       puts("  web ui: shutdown requested");
       break;
@@ -282,8 +283,8 @@ main(int argc, char **argv) {
     if(!ready.notified) {
       char msg[128];
       snprintf(msg, sizeof(msg), "port %u error %d, retrying",
-               (unsigned int)BS5FM_WEB_PORT, -rc);
-      bs5fm_notify("BS5FileManager could not start", msg);
+               (unsigned int)BFPILOT_WEB_PORT, -rc);
+      bfpilot_notify("BFpilot could not start", msg);
       ready.notified = 1;
     }
     sleep(rc == -EADDRINUSE || rc == -EACCES ? 5 : 2);

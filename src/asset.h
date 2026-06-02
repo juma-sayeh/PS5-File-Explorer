@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - embedded asset registry.
+ * BFpilot - embedded asset registry.
  */
 
 #pragma once

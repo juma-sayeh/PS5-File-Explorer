@@ -1,11 +1,11 @@
 {
   "applicationCategoryType": 0,
-  "titleId": "BSFM00001",
+  "titleId": "BFPILOT01",
   "deeplinkUri": "http://127.0.0.1:5905/",
   "localizedParameters": {
     "defaultLanguage": "en-US",
     "en-US": {
-      "titleName": "BS5FileManager"
+      "titleName": "BFpilot"
     }
   }
 }

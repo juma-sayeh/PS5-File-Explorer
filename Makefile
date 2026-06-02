@@ -1,4 +1,4 @@
-# BS5FileManager - minimal PS5 browser file manager payload.
+# BFpilot - minimal PS5 browser file manager payload.
 
 PS5_HOST ?= ps5
 PS5_PORT ?= 9021
@@ -9,7 +9,7 @@ else
     $(error PS5_PAYLOAD_SDK is undefined)
 endif
 
-VERSION_TAG := bs5fm-v0.2.0
+VERSION_TAG := bfpilot-v0.2.0
 BUILD_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 PYTHON ?= python3
 HOST_LLVM_BINDIR ?= $(shell dirname "$$(command -v llvm-strip 2>/dev/null || command -v llvm-strip.exe 2>/dev/null || echo llvm-strip)" 2>/dev/null)
@@ -21,7 +21,7 @@ export LLVM_CONFIG ?= $(UNIX_CURDIR)/build-tools/llvm-config
 BUILD_PATH := $(UNIX_CURDIR)/build-tools:$(HOST_LLVM_BINDIR):/mingw64/bin:/usr/local/bin:/usr/bin:/bin:/c/Users/Blurf/scoop/shims
 BUILD_ENV := cd "$(UNIX_CURDIR)"; export LLVM_CONFIG="$(LLVM_CONFIG)"; export LLVM_BINDIR="$(LLVM_BINDIR)"; export PATH="$(BUILD_PATH):$$PATH"
 
-BIN := bs5filemanager.elf
+BIN := bfpilot.elf
 
 SRCS := src/lite_main.c
 SRCS += src/websrv_lite.c

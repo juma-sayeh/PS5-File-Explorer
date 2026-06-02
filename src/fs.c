@@ -1,5 +1,5 @@
 /*
- * BS5FileManager - direct file and directory serving.
+ * BFpilot - direct file and directory serving.
  */
 
 #include <dirent.h>
