@@ -1,101 +1,142 @@
-# File Explorer - minimal PS5 browser file manager payload.
+# File Explorer - reproducible PS5 payload builds.
+
+SHELL := bash
+
+ifeq ($(strip $(PS5_PAYLOAD_SDK)),)
+$(error PS5_PAYLOAD_SDK is required, e.g. export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk)
+endif
+
+include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
+
+HOST_UNAME := $(shell uname -s 2>/dev/null || echo unknown)
+HOST_IS_WINDOWS := 0
+ifneq (,$(filter MINGW% MSYS% CYGWIN%,$(HOST_UNAME)))
+HOST_IS_WINDOWS := 1
+endif
 
 PS5_HOST ?= ps5
 PS5_PORT ?= 9021
-
-ifdef PS5_PAYLOAD_SDK
-    include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
-else
-    $(error PS5_PAYLOAD_SDK is undefined)
-endif
-
-VERSION_TAG := file-explorer-v0.2.0
-BUILD_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 PYTHON ?= python3
-HOST_LLVM_BINDIR ?= $(shell dirname "$$(command -v llvm-strip 2>/dev/null || command -v llvm-strip.exe 2>/dev/null || echo llvm-strip)" 2>/dev/null)
-LLVM_STRIP ?= llvm-strip
-UNIX_CURDIR := $(shell cygpath -u '$(CURDIR)' 2>/dev/null || pwd)
 
-export LLVM_BINDIR ?= $(HOST_LLVM_BINDIR)
-export LLVM_CONFIG ?= $(UNIX_CURDIR)/build-tools/llvm-config
-BUILD_PATH := $(UNIX_CURDIR)/build-tools:$(HOST_LLVM_BINDIR):/mingw64/bin:/usr/local/bin:/usr/bin:/bin:/c/Users/Blurf/scoop/shims
-BUILD_ENV := cd "$(UNIX_CURDIR)"; export LLVM_CONFIG="$(LLVM_CONFIG)"; export LLVM_BINDIR="$(LLVM_BINDIR)"; export PATH="$(BUILD_PATH):$$PATH"
+VERSION_TAG := file-explorer-v0.2.1
+BUILD_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-BIN := file-explorer.elf
+LLVM_BINDIR ?= $(shell dirname "$$(command -v clang 2>/dev/null || command -v clang.exe 2>/dev/null || command -v llvm-strip 2>/dev/null || command -v llvm-strip.exe 2>/dev/null || echo clang)" 2>/dev/null || echo .)
+LLVM_CONFIG ?= $(CURDIR)/build-tools/llvm-config
+export LLVM_BINDIR
+export LLVM_CONFIG
 
-C_SRCS := src/lite_main.c
-C_SRCS += src/websrv_lite.c
-C_SRCS += src/asset.c
-C_SRCS += src/fs.c
-C_SRCS += src/mime.c
-C_SRCS += src/notify.c
-C_SRCS += src/transfer.c
-C_SRCS += src/archive_common.c
-C_SRCS += src/zip_archive.c
-C_SRCS += src/rar_transfer.c
-C_SRCS += src/app_installer.c
-C_SRCS += src/miniz_tinfl.c
+CORE_BIN := file-explorer-core.elf
+FULL_BIN := file-explorer-full.elf
 
-CXX_SRCS := src/rar_extract.cpp
+COMMON_C_SRCS := src/lite_main.c
+COMMON_C_SRCS += src/diag.c
+COMMON_C_SRCS += src/websrv_lite.c
+COMMON_C_SRCS += src/asset.c
+COMMON_C_SRCS += src/fs.c
+COMMON_C_SRCS += src/mime.c
+COMMON_C_SRCS += src/notify.c
+COMMON_C_SRCS += src/transfer.c
+COMMON_C_SRCS += src/archive_common.c
+COMMON_C_SRCS += src/zip_archive.c
+COMMON_C_SRCS += src/rar_transfer.c
+COMMON_C_SRCS += src/miniz_tinfl.c
 
-UNRAR_SRCS := src/unrar/strlist.cpp
-UNRAR_SRCS += src/unrar/strfn.cpp
-UNRAR_SRCS += src/unrar/pathfn.cpp
-UNRAR_SRCS += src/unrar/smallfn.cpp
-UNRAR_SRCS += src/unrar/global.cpp
-UNRAR_SRCS += src/unrar/file.cpp
-UNRAR_SRCS += src/unrar/filefn.cpp
-UNRAR_SRCS += src/unrar/filcreat.cpp
-UNRAR_SRCS += src/unrar/archive.cpp
-UNRAR_SRCS += src/unrar/arcread.cpp
-UNRAR_SRCS += src/unrar/unicode.cpp
-UNRAR_SRCS += src/unrar/system.cpp
-UNRAR_SRCS += src/unrar/crypt.cpp
-UNRAR_SRCS += src/unrar/crc.cpp
-UNRAR_SRCS += src/unrar/rawread.cpp
-UNRAR_SRCS += src/unrar/encname.cpp
-UNRAR_SRCS += src/unrar/resource.cpp
-UNRAR_SRCS += src/unrar/match.cpp
-UNRAR_SRCS += src/unrar/timefn.cpp
-UNRAR_SRCS += src/unrar/rdwrfn.cpp
-UNRAR_SRCS += src/unrar/consio.cpp
-UNRAR_SRCS += src/unrar/options.cpp
-UNRAR_SRCS += src/unrar/errhnd.cpp
-UNRAR_SRCS += src/unrar/rarvm.cpp
-UNRAR_SRCS += src/unrar/secpassword.cpp
-UNRAR_SRCS += src/unrar/rijndael.cpp
-UNRAR_SRCS += src/unrar/getbits.cpp
-UNRAR_SRCS += src/unrar/sha1.cpp
-UNRAR_SRCS += src/unrar/sha256.cpp
-UNRAR_SRCS += src/unrar/blake2s.cpp
-UNRAR_SRCS += src/unrar/hash.cpp
-UNRAR_SRCS += src/unrar/extinfo.cpp
-UNRAR_SRCS += src/unrar/extract.cpp
-UNRAR_SRCS += src/unrar/volume.cpp
-UNRAR_SRCS += src/unrar/list.cpp
-UNRAR_SRCS += src/unrar/find.cpp
-UNRAR_SRCS += src/unrar/unpack.cpp
-UNRAR_SRCS += src/unrar/headers.cpp
-UNRAR_SRCS += src/unrar/threadpool.cpp
-UNRAR_SRCS += src/unrar/rs16.cpp
-UNRAR_SRCS += src/unrar/cmddata.cpp
-UNRAR_SRCS += src/unrar/ui.cpp
-UNRAR_SRCS += src/unrar/largepage.cpp
-UNRAR_SRCS += src/unrar/filestr.cpp
-UNRAR_SRCS += src/unrar/recvol.cpp
-UNRAR_SRCS += src/unrar/rs.cpp
-UNRAR_SRCS += src/unrar/scantree.cpp
-UNRAR_SRCS += src/unrar/qopen.cpp
+FULL_C_SRCS := $(COMMON_C_SRCS)
+FULL_C_SRCS += src/app_installer.c
+FULL_C_SRCS += src/sce_resolve.c
 
-CFLAGS := -Os -Wall -Werror -Isrc
-CFLAGS += -ffunction-sections -fdata-sections
-CFLAGS += -flto
-CFLAGS += -DVERSION_TAG=\"$(VERSION_TAG)\"
-CFLAGS += -DBUILD_VERSION=\"$(BUILD_VERSION)\"
+COMMON_CXX_SRCS := src/rar_extract.cpp
 
-CXXFLAGS := $(CFLAGS) -std=c++11
-FAST_CFLAGS := $(filter-out -Os,$(CFLAGS)) -O2
-FAST_CXXFLAGS := $(filter-out -Os,$(CXXFLAGS)) -O2
+UNRAR_CXX_SRCS := src/unrar/strlist.cpp
+UNRAR_CXX_SRCS += src/unrar/strfn.cpp
+UNRAR_CXX_SRCS += src/unrar/pathfn.cpp
+UNRAR_CXX_SRCS += src/unrar/smallfn.cpp
+UNRAR_CXX_SRCS += src/unrar/global.cpp
+UNRAR_CXX_SRCS += src/unrar/file.cpp
+UNRAR_CXX_SRCS += src/unrar/filefn.cpp
+UNRAR_CXX_SRCS += src/unrar/filcreat.cpp
+UNRAR_CXX_SRCS += src/unrar/archive.cpp
+UNRAR_CXX_SRCS += src/unrar/arcread.cpp
+UNRAR_CXX_SRCS += src/unrar/unicode.cpp
+UNRAR_CXX_SRCS += src/unrar/system.cpp
+UNRAR_CXX_SRCS += src/unrar/crypt.cpp
+UNRAR_CXX_SRCS += src/unrar/crc.cpp
+UNRAR_CXX_SRCS += src/unrar/rawread.cpp
+UNRAR_CXX_SRCS += src/unrar/encname.cpp
+UNRAR_CXX_SRCS += src/unrar/resource.cpp
+UNRAR_CXX_SRCS += src/unrar/match.cpp
+UNRAR_CXX_SRCS += src/unrar/timefn.cpp
+UNRAR_CXX_SRCS += src/unrar/rdwrfn.cpp
+UNRAR_CXX_SRCS += src/unrar/consio.cpp
+UNRAR_CXX_SRCS += src/unrar/options.cpp
+UNRAR_CXX_SRCS += src/unrar/errhnd.cpp
+UNRAR_CXX_SRCS += src/unrar/rarvm.cpp
+UNRAR_CXX_SRCS += src/unrar/secpassword.cpp
+UNRAR_CXX_SRCS += src/unrar/rijndael.cpp
+UNRAR_CXX_SRCS += src/unrar/getbits.cpp
+UNRAR_CXX_SRCS += src/unrar/sha1.cpp
+UNRAR_CXX_SRCS += src/unrar/sha256.cpp
+UNRAR_CXX_SRCS += src/unrar/blake2s.cpp
+UNRAR_CXX_SRCS += src/unrar/hash.cpp
+UNRAR_CXX_SRCS += src/unrar/extinfo.cpp
+UNRAR_CXX_SRCS += src/unrar/extract.cpp
+UNRAR_CXX_SRCS += src/unrar/volume.cpp
+UNRAR_CXX_SRCS += src/unrar/list.cpp
+UNRAR_CXX_SRCS += src/unrar/find.cpp
+UNRAR_CXX_SRCS += src/unrar/unpack.cpp
+UNRAR_CXX_SRCS += src/unrar/headers.cpp
+UNRAR_CXX_SRCS += src/unrar/threadpool.cpp
+UNRAR_CXX_SRCS += src/unrar/rs16.cpp
+UNRAR_CXX_SRCS += src/unrar/cmddata.cpp
+UNRAR_CXX_SRCS += src/unrar/ui.cpp
+UNRAR_CXX_SRCS += src/unrar/largepage.cpp
+UNRAR_CXX_SRCS += src/unrar/filestr.cpp
+UNRAR_CXX_SRCS += src/unrar/recvol.cpp
+UNRAR_CXX_SRCS += src/unrar/rs.cpp
+UNRAR_CXX_SRCS += src/unrar/scantree.cpp
+UNRAR_CXX_SRCS += src/unrar/qopen.cpp
+
+ARCHIVE_FAST_C_SRCS := src/transfer.c
+ARCHIVE_FAST_C_SRCS += src/archive_common.c
+ARCHIVE_FAST_C_SRCS += src/zip_archive.c
+ARCHIVE_FAST_C_SRCS += src/rar_transfer.c
+ARCHIVE_FAST_C_SRCS += src/miniz_tinfl.c
+
+ASSETS := $(wildcard assets/*)
+GEN_SRCS := $(patsubst assets/%,gen/assets/%,$(ASSETS:=.c))
+APP_ASSETS := assets-app/param.json assets-app/icon0.png
+
+CORE_OBJS := $(patsubst %.c,build/core/%.o,$(COMMON_C_SRCS) $(GEN_SRCS))
+CORE_OBJS += $(patsubst %.cpp,build/core/%.o,$(COMMON_CXX_SRCS) $(UNRAR_CXX_SRCS))
+FULL_OBJS := $(patsubst %.c,build/full/%.o,$(FULL_C_SRCS) $(GEN_SRCS))
+FULL_OBJS += $(patsubst %.cpp,build/full/%.o,$(COMMON_CXX_SRCS) $(UNRAR_CXX_SRCS))
+
+CORE_FAST_OBJS := $(patsubst %.c,build/core/%.o,$(ARCHIVE_FAST_C_SRCS))
+FULL_FAST_OBJS := $(patsubst %.c,build/full/%.o,$(ARCHIVE_FAST_C_SRCS))
+
+COMMON_CFLAGS := -Os -Wall -Werror -Isrc
+COMMON_CFLAGS += -ffunction-sections -fdata-sections -flto
+COMMON_CFLAGS += -DVERSION_TAG=\"$(VERSION_TAG)\"
+COMMON_CFLAGS += -DBUILD_VERSION=\"$(BUILD_VERSION)\"
+COMMON_CFLAGS += -DBFPILOT_SDK_PATH=\"$(PS5_PAYLOAD_SDK)\"
+
+CORE_CFLAGS := $(COMMON_CFLAGS)
+CORE_CFLAGS += -DBFPILOT_ENABLE_LAUNCHER=0
+CORE_CFLAGS += -DBFPILOT_DISABLE_LAUNCHER=1
+CORE_CFLAGS += -DBFPILOT_BUILD_MODE=\"core\"
+
+FULL_CFLAGS := $(COMMON_CFLAGS)
+FULL_CFLAGS += -DBFPILOT_ENABLE_LAUNCHER=1
+FULL_CFLAGS += -DBFPILOT_BUILD_MODE=\"full\"
+
+CORE_CXXFLAGS := $(CORE_CFLAGS) -std=c++11
+FULL_CXXFLAGS := $(FULL_CFLAGS) -std=c++11
+FAST_CORE_CFLAGS := $(filter-out -Os,$(CORE_CFLAGS)) -O2
+FAST_FULL_CFLAGS := $(filter-out -Os,$(FULL_CFLAGS)) -O2
+FAST_CORE_CXXFLAGS := $(filter-out -Os,$(CORE_CXXFLAGS)) -O2
+FAST_FULL_CXXFLAGS := $(filter-out -Os,$(FULL_CXXFLAGS)) -O2
+
 UNRAR_CXXFLAGS := -O2 -std=c++11 -Isrc/unrar
 UNRAR_CXXFLAGS += -ffunction-sections -fdata-sections -flto
 UNRAR_CXXFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
@@ -103,65 +144,88 @@ UNRAR_CXXFLAGS += -DSILENT -DBFPILOT_UNRAR_STREAM
 UNRAR_CXXFLAGS += -Wno-logical-op-parentheses -Wno-switch -Wno-dangling-else
 UNRAR_CXXFLAGS += -Wno-unused-variable -Wno-unused-function
 
-LDFLAGS := -Wl,--gc-sections -flto
-LDFLAGS += -B$(PS5_PAYLOAD_SDK)/win
+COMMON_LDFLAGS := -Wl,--gc-sections -flto
+FULL_LDLIBS := -lSceAppInstUtil
 
-LDADD := -lkernel_sys -lSceNotification
-LDADD += -lSceIpmi -lSceAppInstUtil -lSceUserService -lSceSystemService
-LDADD += -lSceNetCtl
+CC_CMD := "$(CC)"
+CXX_CMD := "$(CXX)"
+STRIP_CMD := "$(STRIP)"
+DEPLOY_CMD := "$(PS5_DEPLOY)"
 
-ASSETS := $(wildcard assets/*)
-GEN_SRCS := $(patsubst assets/%,gen/assets/%,$(ASSETS:=.c))
-APP_ASSETS := assets-app/param.json assets-app/icon0.png
-OBJS := $(C_SRCS:.c=.o)
-OBJS += $(CXX_SRCS:.cpp=.o)
-OBJS += $(UNRAR_SRCS:.cpp=.o)
-OBJS += $(GEN_SRCS:.c=.o)
+ifeq ($(HOST_IS_WINDOWS),1)
+CURDIR_POSIX := $(shell pwd)
+LLVM_CONFIG_POSIX := $(shell cygpath -u "$(LLVM_CONFIG)" 2>/dev/null || printf '%s' "$(LLVM_CONFIG)")
+LLVM_BINDIR_POSIX := $(shell cygpath -u "$(LLVM_BINDIR)" 2>/dev/null || printf '%s' "$(LLVM_BINDIR)")
+RUN_ENV := cd "$(CURDIR_POSIX)" && export LLVM_CONFIG="$(LLVM_CONFIG_POSIX)" && export LLVM_BINDIR="$(LLVM_BINDIR_POSIX)"
+define run
+bash -lc '$(RUN_ENV) && $(1)'
+endef
+else
+define run
+$(1)
+endef
+endif
 
-all: $(BIN)
+all: core full
+
+core: $(CORE_BIN)
+
+full: $(FULL_BIN)
 
 gen/assets:
-	mkdir -p gen/assets
+	$(call run,mkdir -p $@)
 
 gen/assets/%.c: assets/% | gen/assets
-	$(PYTHON) gen-asset-module.py --path $* $< > $@
+	$(call run,$(PYTHON) gen-asset-module.py --path $* $< > $@)
 
-src/transfer.o: src/transfer.c
-	bash -lc '$(BUILD_ENV); $(CC) $(FAST_CFLAGS) -c -o $@ $<'
+$(CORE_FAST_OBJS): build/core/%.o: %.c Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CC_CMD) $(FAST_CORE_CFLAGS) -c $< -o $@)
 
-src/archive_common.o: src/archive_common.c
-	bash -lc '$(BUILD_ENV); $(CC) $(FAST_CFLAGS) -c -o $@ $<'
+$(FULL_FAST_OBJS): build/full/%.o: %.c Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CC_CMD) $(FAST_FULL_CFLAGS) -c $< -o $@)
 
-src/zip_archive.o: src/zip_archive.c
-	bash -lc '$(BUILD_ENV); $(CC) $(FAST_CFLAGS) -c -o $@ $<'
+build/core/src/rar_extract.o: src/rar_extract.cpp Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CXX_CMD) $(FAST_CORE_CXXFLAGS) -c $< -o $@)
 
-src/rar_transfer.o: src/rar_transfer.c
-	bash -lc '$(BUILD_ENV); $(CC) $(FAST_CFLAGS) -c -o $@ $<'
+build/full/src/rar_extract.o: src/rar_extract.cpp Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CXX_CMD) $(FAST_FULL_CXXFLAGS) -c $< -o $@)
 
-src/miniz_tinfl.o: src/miniz_tinfl.c
-	bash -lc '$(BUILD_ENV); $(CC) $(FAST_CFLAGS) -c -o $@ $<'
+build/core/src/unrar/%.o: src/unrar/%.cpp Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CXX_CMD) $(UNRAR_CXXFLAGS) -c $< -o $@)
 
-src/rar_extract.o: src/rar_extract.cpp
-	bash -lc '$(BUILD_ENV); $(CXX) $(FAST_CXXFLAGS) -c -o $@ $<'
+build/full/src/unrar/%.o: src/unrar/%.cpp Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CXX_CMD) $(UNRAR_CXXFLAGS) -c $< -o $@)
 
-%.o: %.c
-	bash -lc '$(BUILD_ENV); $(CC) $(CFLAGS) -c -o $@ $<'
+build/core/%.o: %.c Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CC_CMD) $(CORE_CFLAGS) -c $< -o $@)
 
-src/unrar/%.o: src/unrar/%.cpp
-	bash -lc '$(BUILD_ENV); $(CXX) $(UNRAR_CXXFLAGS) -c -o $@ $<'
+build/full/%.o: %.c Makefile
+	$(call run,mkdir -p $(dir $@))
+	$(call run,$(CC_CMD) $(FULL_CFLAGS) -c $< -o $@)
 
-%.o: %.cpp
-	bash -lc '$(BUILD_ENV); $(CXX) $(CXXFLAGS) -c -o $@ $<'
+$(CORE_BIN): $(CORE_OBJS)
+	$(call run,$(CXX_CMD) $(CORE_CXXFLAGS) $(COMMON_LDFLAGS) -o $@ $(CORE_OBJS))
+	$(call run,$(STRIP_CMD) --strip-all $@)
 
-$(BIN): $(OBJS) $(APP_ASSETS)
-	bash -lc '$(BUILD_ENV); $(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)'
-	bash -lc 'cd "$(UNIX_CURDIR)"; test -f $@'
-	bash -lc '$(BUILD_ENV); $(LLVM_STRIP) --strip-all $@'
+$(FULL_BIN): $(FULL_OBJS) $(APP_ASSETS)
+	$(call run,$(CXX_CMD) $(FULL_CXXFLAGS) $(COMMON_LDFLAGS) -o $@ $(FULL_OBJS) $(FULL_LDLIBS))
+	$(call run,$(STRIP_CMD) --strip-all $@)
 
-deploy: $(BIN)
-	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $<
+deploy-core: core
+	$(call run,$(DEPLOY_CMD) -h $(PS5_HOST) -p $(PS5_PORT) $(CORE_BIN))
+
+deploy-full: full
+	$(call run,$(DEPLOY_CMD) -h $(PS5_HOST) -p $(PS5_PORT) $(FULL_BIN))
 
 clean:
-	rm -rf $(BIN) gen $(OBJS)
+	$(call run,rm -rf $(CORE_BIN) $(FULL_BIN) build gen)
 
-.PHONY: all clean deploy
+.SECONDARY: $(GEN_SRCS)
+.PHONY: all core full clean deploy-core deploy-full

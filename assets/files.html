@@ -1212,6 +1212,7 @@
       <div class="target-grid">
         <button data-target="/data/homebrew">/data/homebrew</button>
         <button data-target="/mnt/usb0">/mnt/usb0</button>
+        <button data-target="/mnt/ext0">/mnt/ext0</button>
         <button id="target-current">Current</button>
         <button id="open-target">Open</button>
       </div>
@@ -1251,6 +1252,7 @@
     const places = [
       ['Root', '/'],
       ['Data', '/data'],
+      ['Homebrew', '/data/homebrew'],
       ['Mounts', '/mnt'],
       ['User', '/user'],
       ['System', '/system_data']
@@ -3993,15 +3995,26 @@
       try {
         const usb = await api('/api/fs/usb');
         for (const mount of usb.mounts || []) {
-          extra.push([mount.path.replace('/mnt/', '').toUpperCase(), mount.path]);
+          let label = mount.path
+            .replace('/mnt/', '')
+            .replace('/data/', '')
+            .toUpperCase();
+          if (mount.kind === 'homebrew' && mount.path !== '/data/homebrew') {
+            label = label.replace('/HOMEBREW', ' HB');
+          }
+          extra.push([label, mount.path]);
         }
       } catch (err) {}
 
+      const seenPlaces = new Set();
       for (const [label, path] of places.concat(extra)) {
+        const clean = cleanPath(path);
+        if (seenPlaces.has(clean)) continue;
+        seenPlaces.add(clean);
         const button = document.createElement('button');
         button.textContent = label;
-        button.dataset.path = path;
-        button.addEventListener('click', () => openPath(path));
+        button.dataset.path = clean;
+        button.addEventListener('click', () => openPath(clean));
         placeRoot.appendChild(button);
       }
 

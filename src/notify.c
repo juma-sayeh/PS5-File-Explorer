@@ -2,15 +2,13 @@
  * File Explorer - PS5 notification helpers.
  */
 
-#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
+#include "diag.h"
 #include "notify.h"
-
-
-#define SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM 0xFE
-
 
 typedef struct notify_request {
   char unused[45];
@@ -18,14 +16,16 @@ typedef struct notify_request {
 } notify_request_t;
 
 
-int sceNotificationSend(int userId, bool isLogged, const char *payload);
 int sceKernelSendNotificationRequest(int, notify_request_t *req, size_t size,
-                                     int flags);
+                                     int flags) __attribute__((weak));
 
 
-static void
+static int
 notify_debug(const char *message, const char *submessage) {
   notify_request_t req;
+
+  if(!sceKernelSendNotificationRequest) return -2;
+
   memset(&req, 0, sizeof(req));
 
   if(submessage && submessage[0]) {
@@ -34,43 +34,31 @@ notify_debug(const char *message, const char *submessage) {
     snprintf(req.message, sizeof(req.message), "%s", message);
   }
 
-  sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+  return sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+}
+
+
+int
+bfpilot_notify_send(const char *message, const char *submessage) {
+  const char *msg = message ? message : "File Explorer";
+  const char *sub = submessage ? submessage : "";
+  const char *disabled = getenv("BFPILOT_NO_NOTIFY");
+
+  if(disabled && (!strcmp(disabled, "1") || !strcasecmp(disabled, "true") ||
+                  !strcasecmp(disabled, "yes"))) {
+    return BFPILOT_DIAG_SKIPPED;
+  }
+  return notify_debug(msg, sub);
+}
+
+
+int
+bfpilot_notify_test(void) {
+  return bfpilot_notify_send("File Explorer diagnostics", "notification test");
 }
 
 
 void
 bfpilot_notify(const char *message, const char *submessage) {
-  char payload[4096];
-  const char *msg = message ? message : "File Explorer";
-  const char *sub = submessage ? submessage : "";
-
-  snprintf(payload, sizeof(payload),
-           "{"
-           "\"rawData\":{"
-           "\"viewTemplateType\":\"InteractiveToastTemplateB\","
-           "\"channelType\":\"Downloads\","
-           "\"useCaseId\":\"IDC\","
-           "\"toastOverwriteType\":\"No\","
-           "\"isImmediate\":true,"
-           "\"priority\":100,"
-           "\"viewData\":{"
-           "\"icon\":{\"type\":\"Predefined\",\"parameters\":{\"icon\":\"download\"}},"
-           "\"message\":{\"body\":\"%s\"},"
-           "\"subMessage\":{\"body\":\"%s\"}"
-           "},"
-           "\"platformViews\":{"
-           "\"previewDisabled\":{"
-           "\"viewData\":{"
-           "\"icon\":{\"type\":\"Predefined\",\"parameters\":{\"icon\":\"download\"}},"
-           "\"message\":{\"body\":\"%s\"}"
-           "}"
-           "}"
-           "}"
-           "},"
-           "\"localNotificationId\":\"5905\""
-           "}",
-           msg, sub, msg);
-
-  sceNotificationSend(SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM, true, payload);
-  notify_debug(msg, sub);
+  (void)bfpilot_notify_send(message, submessage);
 }

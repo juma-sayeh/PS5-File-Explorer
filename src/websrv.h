@@ -16,6 +16,22 @@ typedef struct http_request {
 
 typedef void (*websrv_ready_cb_t)(unsigned short port, void *arg);
 
+typedef struct bfpilot_launcher_diag {
+  int launcher_enabled;
+  int launcher_attempted;
+  int appinst_init_rc;
+  int title_dir_resolved;
+  int install_title_dir_resolved;
+  int install_title_rc;
+  int uninstall_resolved;
+  int uninstall_rc;
+  int install_all_resolved;
+  int install_all_rc;
+  int user_app_writable;
+  int launcher_install_rc;
+  char launcher_final_state[32];
+} bfpilot_launcher_diag_t;
+
 
 int websrv_write_all(int fd, const void *data, size_t size);
 
@@ -36,6 +52,10 @@ void websrv_url_decode(char *out, size_t out_size, const char *in);
 
 int websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
                   void *ready_arg);
+
+void websrv_set_runtime_diag(int launcher_disabled);
+
+void websrv_set_launcher_diag(const bfpilot_launcher_diag_t *diag);
 
 void websrv_request_exit(void);
 

@@ -1352,30 +1352,71 @@ du_request(const http_request_t *req) {
 
 
 static int
-usb_request(const http_request_t *req) {
-  json_buf_t b = {0};
-  if(json_append(&b, "{\"ok\":true,\"mounts\":[") != 0) return -1;
-  int first = 1;
-  for(int i = 0; i < 8; i++) {
-    char path[24];
-    snprintf(path, sizeof(path), "/mnt/usb%d", i);
-    struct stat st;
-    if(stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
-    char probe[40];
-    snprintf(probe, sizeof(probe), "%s/.el_probe", path);
+append_fs_place(json_buf_t *b, int *first, const char *path,
+                const char *kind) {
+  struct stat st;
+  if(stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) return 0;
+
+  char probe[128];
+  int n = snprintf(probe, sizeof(probe), "%s/.bfpilot_probe", path);
+  int writable = 0;
+  if(n > 0 && (size_t)n < sizeof(probe)) {
     int fd = open(probe, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    int writable = 0;
     if(fd >= 0) {
       writable = 1;
       close(fd);
       unlink(probe);
     }
-    if(!first && json_append(&b, ",") != 0) break;
-    first = 0;
-    if(json_append(&b, "{\"path\":") != 0 ||
-       json_string(&b, path) != 0 ||
-       json_appendf(&b, ",\"writable\":%s}", writable ? "true" : "false") != 0) {
-      break;
+  }
+
+  if(!*first && json_append(b, ",") != 0) return -1;
+  *first = 0;
+
+  if(json_append(b, "{\"path\":") != 0 ||
+     json_string(b, path) != 0 ||
+     json_append(b, ",\"kind\":") != 0 ||
+     json_string(b, kind ? kind : "path") != 0 ||
+     json_appendf(b, ",\"writable\":%s}", writable ? "true" : "false") != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+
+static int
+usb_request(const http_request_t *req) {
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,\"mounts\":[") != 0) return -1;
+  int first = 1;
+
+  if(append_fs_place(&b, &first, "/data/homebrew", "homebrew") != 0) {
+    free(b.data);
+    return -1;
+  }
+  for(int i = 0; i < 8; i++) {
+    char path[24];
+    snprintf(path, sizeof(path), "/mnt/usb%d", i);
+    if(append_fs_place(&b, &first, path, "usb") != 0) {
+      free(b.data);
+      return -1;
+    }
+    snprintf(path, sizeof(path), "/mnt/usb%d/homebrew", i);
+    if(append_fs_place(&b, &first, path, "homebrew") != 0) {
+      free(b.data);
+      return -1;
+    }
+  }
+  for(int i = 0; i < 8; i++) {
+    char path[24];
+    snprintf(path, sizeof(path), "/mnt/ext%d", i);
+    if(append_fs_place(&b, &first, path, "ext") != 0) {
+      free(b.data);
+      return -1;
+    }
+    snprintf(path, sizeof(path), "/mnt/ext%d/homebrew", i);
+    if(append_fs_place(&b, &first, path, "homebrew") != 0) {
+      free(b.data);
+      return -1;
     }
   }
   if(json_append(&b, "]}") != 0) {

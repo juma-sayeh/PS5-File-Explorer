@@ -4,6 +4,7 @@ gen/
 *.a
 *.so
 *.elf
+!test-builds/**/*.elf
 
 # Local environment / editor noise
 .env

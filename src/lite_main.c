@@ -6,10 +6,12 @@
  */
 
 #include <errno.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -20,16 +22,26 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#include "app_installer.h"
+#include "diag.h"
 #include "notify.h"
 #include "version.h"
 #include "websrv.h"
 
+#if BFPILOT_ENABLE_LAUNCHER
+#include "app_installer.h"
+#include "sce_resolve.h"
+#endif
+
 #define BFPILOT_WEB_PORT 5905
 #define BFPILOT_RELOAD_TOKEN "bs5fm-local-reload"
 
-int sceNetCtlInit(void);
-int sceUserServiceInitialize(void *);
+#if BFPILOT_ENABLE_LAUNCHER
+typedef int (*sce_netctl_init_fn)(void);
+typedef int (*sce_user_service_initialize_fn)(void *);
+
+#define BFPILOT_NETCTL_MODULE "libSceNetCtl.sprx"
+#define BFPILOT_USER_SERVICE_MODULE "libSceUserService.sprx"
+#endif
 
 
 static void
@@ -59,17 +71,140 @@ detect_lan_ip(char *out, size_t out_size) {
 typedef struct ready_state {
   char ip[64];
   int notified;
+  int launcher_disabled;
+  int launcher_started;
 } ready_state_t;
 
 
+#if BFPILOT_ENABLE_LAUNCHER
 static void
 init_ps5_services(void) {
   int user_prio = 256;
-  int err = sceNetCtlInit();
-  printf("  service: sceNetCtlInit 0x%08x\n", err);
+  int netctl_rc = BFPILOT_DIAG_SKIPPED;
+  int user_service_rc = BFPILOT_DIAG_SKIPPED;
+  sce_netctl_init_fn sce_netctl_init = NULL;
+  sce_user_service_initialize_fn sce_user_service_initialize = NULL;
 
-  err = sceUserServiceInitialize(&user_prio);
-  printf("  service: sceUserServiceInitialize 0x%08x\n", err);
+  int resolve_rc = sce_resolve_symbol(BFPILOT_NETCTL_MODULE,
+                                      "sceNetCtlInit",
+                                      (void **)&sce_netctl_init);
+  bfpilot_log("sce resolve %s:sceNetCtlInit %s rc=0x%08x",
+              BFPILOT_NETCTL_MODULE,
+              sce_netctl_init ? "ok" : "missing", resolve_rc);
+  if(sce_netctl_init) {
+    netctl_rc = sce_netctl_init();
+    bfpilot_log("sceNetCtlInit rc=0x%08x", netctl_rc);
+  } else {
+    bfpilot_log("sceNetCtlInit rc=skipped");
+  }
+
+  resolve_rc = sce_resolve_symbol(BFPILOT_USER_SERVICE_MODULE,
+                                  "sceUserServiceInitialize",
+                                  (void **)&sce_user_service_initialize);
+  bfpilot_log("sce resolve %s:sceUserServiceInitialize %s rc=0x%08x",
+              BFPILOT_USER_SERVICE_MODULE,
+              sce_user_service_initialize ? "ok" : "missing", resolve_rc);
+  if(sce_user_service_initialize) {
+    user_service_rc = sce_user_service_initialize(&user_prio);
+    bfpilot_log("sceUserServiceInitialize rc=0x%08x", user_service_rc);
+  } else {
+    bfpilot_log("sceUserServiceInitialize rc=skipped");
+  }
+
+  bfpilot_diag_set_service_rcs(netctl_rc, user_service_rc);
+}
+#endif
+
+
+#if BFPILOT_ENABLE_LAUNCHER
+typedef struct launcher_thread_arg {
+  char ip[64];
+} launcher_thread_arg_t;
+
+
+static void *
+launcher_thread(void *arg) {
+  launcher_thread_arg_t *state = arg;
+  char fallback[128];
+
+  snprintf(fallback, sizeof(fallback), "Use http://%s:%u/",
+           state && state->ip[0] ? state->ip : "<PS5_IP>",
+           (unsigned int)BFPILOT_WEB_PORT);
+
+  bfpilot_checkpoint("launcher started");
+  bfpilot_diag_set_launcher_status("started", 0);
+  bfpilot_log("launcher started after web server");
+  init_ps5_services();
+
+  int app_install_status = bfpilot_install_app_if_needed();
+  if(app_install_status >= 0) {
+    bfpilot_diag_set_launcher_status("ready", app_install_status);
+    bfpilot_log("launcher ready rc=%d", app_install_status);
+    puts("  ps5 app: ready");
+  } else {
+    bfpilot_diag_set_launcher_status("failed_nonfatal", app_install_status);
+    bfpilot_log("launcher skipped rc=%d, web server remains available",
+                app_install_status);
+    bfpilot_notify("File Explorer launcher skipped", fallback);
+    puts("  ps5 app: launcher skipped, web server remains available");
+  }
+
+  free(state);
+  return NULL;
+}
+
+
+static void
+start_launcher_thread(const char *ip) {
+  launcher_thread_arg_t *state = calloc(1, sizeof(*state));
+  if(!state) {
+    bfpilot_diag_set_launcher_status("failed_nonfatal", -ENOMEM);
+    bfpilot_log("launcher skipped: failed allocating thread state");
+    bfpilot_notify("File Explorer launcher skipped", "Use http://<PS5_IP>:5905/");
+    return;
+  }
+  snprintf(state->ip, sizeof(state->ip), "%s", ip ? ip : "<PS5_IP>");
+
+  pthread_t thread;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  int rc = pthread_create(&thread, &attr, launcher_thread, state);
+  pthread_attr_destroy(&attr);
+  if(rc != 0) {
+    bfpilot_diag_set_launcher_status("failed_nonfatal", -rc);
+    bfpilot_log("launcher skipped: pthread_create rc=%d", rc);
+    bfpilot_notify("File Explorer launcher skipped", "Use http://<PS5_IP>:5905/");
+    free(state);
+  }
+}
+#endif
+
+
+static int
+launcher_disabled_requested(int argc, char **argv) {
+#if !BFPILOT_ENABLE_LAUNCHER
+  (void)argc;
+  (void)argv;
+  return 1;
+#else
+  const char *env_value = getenv("BFPILOT_NO_LAUNCHER");
+  int env_enabled = env_value &&
+                    (!strcmp(env_value, "1") ||
+                     !strcasecmp(env_value, "true") ||
+                     !strcasecmp(env_value, "yes") ||
+                     !strcasecmp(env_value, "on"));
+
+  if(env_enabled) {
+    return 1;
+  }
+  for(int i = 1; i < argc; i++) {
+    if(argv[i] && !strcmp(argv[i], "--no-launcher")) {
+      return 1;
+    }
+  }
+  return 0;
+#endif
 }
 
 
@@ -176,11 +311,17 @@ handoff_existing_server(void) {
   if(!strstr(response, "\"name\":\"File Explorer\"") &&
      !strstr(response, "\"name\":\"BFpilot\"") &&
      !strstr(response, "\"name\":\"BS5FileManager\"")) {
-    return 0;
+    bfpilot_log("handoff: port %u belongs to a different service; leaving it "
+                "running", (unsigned int)BFPILOT_WEB_PORT);
+    bfpilot_notify("File Explorer reload skipped",
+                   "Port 5905 is used by another service");
+    return -1;
   }
 
   long old_pid = json_long_field(response, "pid");
-  if(old_pid <= 0 || old_pid == (long)getpid()) {
+  bfpilot_log("handoff: existing File Explorer-compatible server pid=%ld",
+              old_pid);
+  if(old_pid == (long)getpid()) {
     return 0;
   }
 
@@ -202,19 +343,10 @@ handoff_existing_server(void) {
     return 1;
   }
 
-  if(kill((pid_t)old_pid, SIGTERM) == 0 && wait_for_old_server_down()) {
-    bfpilot_notify("File Explorer reloaded", "Old listener stopped");
-    return 1;
-  }
-
-  kill((pid_t)old_pid, SIGKILL);
-  if(wait_for_old_server_down()) {
-    bfpilot_notify("File Explorer reloaded", "Old listener was replaced");
-    return 1;
-  }
-
   bfpilot_notify("File Explorer reload failed",
                  "Could not stop old listener on port 5905");
+  bfpilot_log("handoff: old listener did not accept clean shutdown; not "
+              "sending signals");
   return -1;
 }
 
@@ -227,23 +359,49 @@ on_web_ready(unsigned short port, void *arg) {
   snprintf(url, sizeof(url), "Open http://%s:%u/",
            state->ip, (unsigned int)port);
 
-  printf("  web ui ready: http://%s:%u/\n", state->ip, (unsigned int)port);
+  bfpilot_checkpoint("web server ready");
+  bfpilot_log("web ui ready http://%s:%u/", state->ip, (unsigned int)port);
 
   if(!state->notified) {
     bfpilot_notify("File Explorer started", url);
     state->notified = 1;
   }
+
+#if BFPILOT_ENABLE_LAUNCHER
+  if(!state->launcher_disabled && !state->launcher_started) {
+    state->launcher_started = 1;
+    start_launcher_thread(state->ip);
+  }
+#endif
 }
 
 
 int
 main(int argc, char **argv) {
-  (void)argc;
-  (void)argv;
+  bfpilot_diag_init();
+  bfpilot_diag_install_signal_handlers();
+  bfpilot_checkpoint("process start");
+  bfpilot_log("build version tag=%s build=%s mode=%s",
+              VERSION_TAG, BUILD_VERSION, BFPILOT_BUILD_MODE);
+  bfpilot_log("PID=%ld", (long)getpid());
+  bfpilot_log("argv argc=%d", argc);
+  for(int i = 0; i < argc; i++) {
+    bfpilot_log("argv[%d]=%s", i, argv && argv[i] ? argv[i] : "(null)");
+  }
+  bfpilot_log("PS5 SDK build flags sdk_path=%s enable_launcher=%d "
+              "disable_launcher=%d",
+              BFPILOT_SDK_PATH, BFPILOT_ENABLE_LAUNCHER,
+              BFPILOT_DISABLE_LAUNCHER);
+  bfpilot_log("diagnostic paths log=/data/FileExplorer/log.txt crash=/data/FileExplorer/"
+              "crash.log");
 
   ready_state_t ready;
   memset(&ready, 0, sizeof(ready));
   detect_lan_ip(ready.ip, sizeof(ready.ip));
+  int launcher_disabled = launcher_disabled_requested(argc, argv);
+  ready.launcher_disabled = launcher_disabled;
+  websrv_set_runtime_diag(launcher_disabled);
+  bfpilot_log("runtime launcher_disabled=%d", launcher_disabled);
 
   puts(".----------------------------------------------.");
   puts("|  File Explorer                               |");
@@ -251,8 +409,13 @@ main(int argc, char **argv) {
   puts("'----------------------------------------------'");
   puts("");
   puts("  active: standalone web file manager");
+  printf("  mode: %s\n", BFPILOT_BUILD_MODE);
   puts("  scope: browse, upload, download, copy, move, delete, rename, mkdir");
-  puts("  ps5 app: File Explorer opens http://127.0.0.1:5905/");
+  if(launcher_disabled) {
+    puts("  ps5 app: launcher disabled");
+  } else {
+    puts("  ps5 app: File Explorer opens http://127.0.0.1:5905/");
+  }
   printf("  web ui: http://%s:%u/\n", ready.ip, (unsigned int)BFPILOT_WEB_PORT);
   puts("  inject/deploy port: 9021");
   puts("");
@@ -260,24 +423,47 @@ main(int argc, char **argv) {
   signal(SIGPIPE, SIG_IGN);
   signal(SIGCHLD, SIG_IGN);
 
-  init_ps5_services();
+  int notification_rc = bfpilot_notify_test();
+  bfpilot_diag_set_notification_rc(notification_rc);
+  bfpilot_log("notification test rc=0x%08x", notification_rc);
 
-  int app_install_status = bfpilot_install_app_if_needed();
-  if(app_install_status >= 0) {
-    puts("  ps5 app: ready");
+#if BFPILOT_ENABLE_LAUNCHER
+  if(!launcher_disabled) {
+    bfpilot_diag_set_launcher_status("deferred", BFPILOT_DIAG_SKIPPED);
+    bfpilot_log("launcher deferred until web server is listening");
+    puts("  ps5 app: launcher will run after web server starts");
   } else {
-    puts("  ps5 app: install failed, continuing web server");
+    bfpilot_diag_set_service_rcs(BFPILOT_DIAG_SKIPPED, BFPILOT_DIAG_SKIPPED);
+    bfpilot_diag_set_launcher_status("skipped", BFPILOT_DIAG_SKIPPED);
+    bfpilot_log("sceNetCtlInit rc=skipped");
+    bfpilot_log("sceUserServiceInitialize rc=skipped");
+    bfpilot_log("launcher skipped: runtime flag");
+    puts("  ps5 app: skipped by runtime flag");
   }
+#else
+  bfpilot_diag_set_service_rcs(BFPILOT_DIAG_SKIPPED, BFPILOT_DIAG_SKIPPED);
+  bfpilot_diag_set_launcher_status("not_compiled", BFPILOT_DIAG_SKIPPED);
+  bfpilot_log("sceNetCtlInit rc=skipped");
+  bfpilot_log("sceUserServiceInitialize rc=skipped");
+  bfpilot_log("launcher skipped: not compiled");
+  puts("  ps5 app: not compiled in core mode");
+#endif
 
+  bfpilot_checkpoint("handoff check");
   int handoff_status = handoff_existing_server();
+  bfpilot_log("handoff_existing_server rc=%d", handoff_status);
   if(handoff_status < 0) {
+    bfpilot_checkpoint("handoff blocked");
     puts("  reload: old listener still active; exiting this injection");
     return 0;
   }
 
   while(1) {
+    bfpilot_checkpoint("web listen starting");
     int rc = websrv_listen(BFPILOT_WEB_PORT, on_web_ready, &ready);
+    bfpilot_log("websrv_listen returned rc=%d", rc);
     if(websrv_exit_requested()) {
+      bfpilot_checkpoint("web shutdown requested");
       puts("  web ui: shutdown requested");
       break;
     }

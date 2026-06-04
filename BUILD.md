@@ -1,6 +1,9 @@
 # File Explorer Build Manual
 
-This project builds a PS5 payload ELF named `file-explorer.elf`.
+This project builds two PS5 payload ELFs:
+
+- `file-explorer-core.elf` for the safest firmware compatibility path.
+- `file-explorer-full.elf` for optional PS5 launcher tile support.
 
 ## Requirements
 
@@ -15,8 +18,7 @@ On this Mac, the known working paths are:
 ```sh
 PS5_PAYLOAD_SDK=/Users/jumasayeh/Developer/ps5-payload-sdk
 LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config
-HOST_LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin
-LLVM_STRIP=/Users/jumasayeh/Developer/ps5-payload-sdk/bin/llvm-strip
+LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin
 ```
 
 If `llvm@18` is missing, install it:
@@ -37,14 +39,14 @@ make clean PS5_PAYLOAD_SDK=/Users/jumasayeh/Developer/ps5-payload-sdk
 make \
   PS5_PAYLOAD_SDK=/Users/jumasayeh/Developer/ps5-payload-sdk \
   LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config \
-  HOST_LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin \
-  LLVM_STRIP=/Users/jumasayeh/Developer/ps5-payload-sdk/bin/llvm-strip
+  LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin
 ```
 
 Output:
 
 ```text
-file-explorer.elf
+file-explorer-core.elf
+file-explorer-full.elf
 ```
 
 Generated asset C files are written under:
@@ -53,14 +55,14 @@ Generated asset C files are written under:
 gen/assets/
 ```
 
-Both `file-explorer.elf` and `gen/` are ignored by git.
+The generated ELF files, build intermediates, and `gen/` are ignored by git.
 
 ## Verify Build Output
 
 ```sh
-ls -lh file-explorer.elf
-file file-explorer.elf
-shasum -a 256 file-explorer.elf
+ls -lh file-explorer-core.elf file-explorer-full.elf
+file file-explorer-core.elf file-explorer-full.elf
+shasum -a 256 file-explorer-core.elf file-explorer-full.elf
 ```
 
 Expected file type:
@@ -94,8 +96,7 @@ The SDK wrapper could not find the real LLVM binaries. Use the explicit LLVM ove
 make \
   PS5_PAYLOAD_SDK=/Users/jumasayeh/Developer/ps5-payload-sdk \
   LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config \
-  HOST_LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin \
-  LLVM_STRIP=/Users/jumasayeh/Developer/ps5-payload-sdk/bin/llvm-strip
+  LLVM_BINDIR=/opt/homebrew/opt/llvm@18/bin
 ```
 
 Check LLVM exists:
@@ -110,19 +111,19 @@ ls -l /opt/homebrew/opt/llvm@18/bin/clang
 If the PS5 is running `ftpsrv.elf` on port `2121`, replace the Payload Manager copy:
 
 ```sh
-curl -T /path/to/PS5-File-Explorer/file-explorer.elf \
-  ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf
+curl -T /path/to/PS5-File-Explorer/file-explorer-full.elf \
+  ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer-full.elf
 ```
 
 Verify the uploaded file:
 
 ```sh
-curl ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf \
-  -o /tmp/remote-file-explorer.elf
+curl ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer-full.elf \
+  -o /tmp/remote-file-explorer-full.elf
 
 shasum -a 256 \
-  /path/to/PS5-File-Explorer/file-explorer.elf \
-  /tmp/remote-file-explorer.elf
+  /path/to/PS5-File-Explorer/file-explorer-full.elf \
+  /tmp/remote-file-explorer-full.elf
 ```
 
 The hashes should match.
@@ -145,10 +146,11 @@ http://192.168.1.172:5905/
 
 ## Optional Direct Deploy
 
-The Makefile also has a deploy target:
+The Makefile also has deploy targets:
 
 ```sh
-make deploy PS5_HOST=<PS5_IP> PS5_PORT=9021
+make deploy-core PS5_HOST=<PS5_IP> PS5_PORT=9021
+make deploy-full PS5_HOST=<PS5_IP> PS5_PORT=9021
 ```
 
 This requires a payload loader listening on port `9021`.

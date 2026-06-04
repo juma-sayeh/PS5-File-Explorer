@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 
 #include "asset.h"
+#include "diag.h"
 #include "fs.h"
 #include "transfer.h"
 #include "version.h"
@@ -33,6 +34,48 @@
 static int             g_websrv_srvfd = -1;
 static pthread_mutex_t g_websrv_lock = PTHREAD_MUTEX_INITIALIZER;
 static volatile sig_atomic_t g_websrv_exit_requested = 0;
+static int             g_launcher_runtime_disabled = 0;
+static bfpilot_launcher_diag_t g_launcher_diag = {
+  .launcher_enabled = 0,
+  .launcher_attempted = 0,
+  .appinst_init_rc = -1,
+  .title_dir_resolved = 0,
+  .install_title_dir_resolved = 0,
+  .install_title_rc = BFPILOT_DIAG_SKIPPED,
+  .uninstall_resolved = 0,
+  .uninstall_rc = BFPILOT_DIAG_SKIPPED,
+  .install_all_resolved = 0,
+  .install_all_rc = BFPILOT_DIAG_SKIPPED,
+  .user_app_writable = -1,
+  .launcher_install_rc = -1,
+  .launcher_final_state = "skipped",
+};
+
+
+void
+websrv_set_runtime_diag(int launcher_disabled) {
+  g_launcher_runtime_disabled = launcher_disabled ? 1 : 0;
+  g_launcher_diag.launcher_enabled =
+      BFPILOT_ENABLE_LAUNCHER && !g_launcher_runtime_disabled;
+  if(!g_launcher_diag.launcher_attempted) {
+    g_launcher_diag.appinst_init_rc = BFPILOT_DIAG_SKIPPED;
+    g_launcher_diag.install_title_rc = BFPILOT_DIAG_SKIPPED;
+    g_launcher_diag.uninstall_rc = BFPILOT_DIAG_SKIPPED;
+    g_launcher_diag.install_all_rc = BFPILOT_DIAG_SKIPPED;
+    snprintf(g_launcher_diag.launcher_final_state,
+             sizeof(g_launcher_diag.launcher_final_state), "%s", "skipped");
+  }
+}
+
+
+void
+websrv_set_launcher_diag(const bfpilot_launcher_diag_t *diag) {
+  if(!diag) return;
+  g_launcher_diag = *diag;
+  g_launcher_diag.launcher_enabled =
+      BFPILOT_ENABLE_LAUNCHER && !g_launcher_runtime_disabled &&
+      diag->launcher_enabled;
+}
 
 
 static const char *
@@ -269,20 +312,177 @@ content_length_from_headers(const char *headers) {
 }
 
 
+static const char *
+json_bool(int value) {
+  return value ? "true" : "false";
+}
+
+
+static const char *
+json_tristate(int value) {
+  if(value < 0) return "null";
+  return value ? "true" : "false";
+}
+
+
 static int
 status_request(const http_request_t *req) {
-  char body[512];
+  char body[768];
   time_t now = time(NULL);
   int n = snprintf(body, sizeof(body),
                    "{\"ok\":true,"
                    "\"name\":\"File Explorer\","
                    "\"tag\":\"%s\","
                    "\"version\":\"%s\","
+                   "\"mode\":\"%s\","
                    "\"pid\":%ld,"
                    "\"now\":%ld,"
                    "\"services\":[\"web\",\"file-manager\"],"
+                   "\"launcherCompiled\":%s,"
+                   "\"launcherDisabled\":%s,"
                    "\"port\":5905}",
-                   VERSION_TAG, BUILD_VERSION, (long)getpid(), (long)now);
+                   VERSION_TAG, BUILD_VERSION, BFPILOT_BUILD_MODE,
+                   (long)getpid(), (long)now,
+                   BFPILOT_ENABLE_LAUNCHER ? "true" : "false",
+                   g_launcher_runtime_disabled ? "true" : "false");
+  if(n < 0) return -1;
+  if((size_t)n >= sizeof(body)) n = (int)sizeof(body) - 1;
+  return websrv_send(req->fd, 200, "application/json", body, (size_t)n);
+}
+
+
+static int
+diag_request(const http_request_t *req) {
+  char body[6144];
+  char cwd[256];
+  char cwd_json[512];
+  char launcher_status_json[128];
+  char launcher_final_json[64];
+  char checkpoint_json[192];
+  time_t now = time(NULL);
+  int can_stat_root = bfpilot_diag_can_stat_root();
+  int can_opendir_data = bfpilot_diag_can_opendir_data();
+  int can_opendir_data_homebrew = bfpilot_diag_can_opendir_data_homebrew();
+  int can_opendir_usb0 = bfpilot_diag_can_opendir_usb0();
+  int can_opendir_ext0 = bfpilot_diag_can_opendir_ext0();
+  int can_opendir_ext0_homebrew = bfpilot_diag_can_opendir_ext0_homebrew();
+  int can_write_data = bfpilot_diag_can_write_data_bfpilot();
+  int can_write_user_app = bfpilot_diag_can_write_user_app();
+  int core_server_started =
+      bfpilot_diag_bind_rc() == 0 && bfpilot_diag_listen_rc() == 0;
+
+  bfpilot_diag_get_cwd(cwd, sizeof(cwd));
+  int last_errno = bfpilot_diag_last_errno();
+  json_error_escape(cwd_json, sizeof(cwd_json), cwd);
+  json_error_escape(launcher_status_json, sizeof(launcher_status_json),
+                    bfpilot_diag_launcher_status());
+  json_error_escape(launcher_final_json, sizeof(launcher_final_json),
+                    g_launcher_diag.launcher_final_state);
+  json_error_escape(checkpoint_json, sizeof(checkpoint_json),
+                    bfpilot_diag_checkpoint());
+
+  int n = snprintf(body, sizeof(body),
+                   "{\"ok\":true,"
+                   "\"name\":\"File Explorer\","
+                   "\"tag\":\"%s\","
+                   "\"version\":\"%s\","
+                   "\"mode\":\"%s\","
+                   "\"pid\":%ld,"
+                   "\"now\":%ld,"
+                   "\"uptime\":%ld,"
+                   "\"port\":5905,"
+                   "\"cwd\":\"%s\","
+                   "\"can_stat_root\":%s,"
+                   "\"can_opendir_data\":%s,"
+                   "\"can_opendir_data_homebrew\":%s,"
+                   "\"can_opendir_usb0\":%s,"
+                   "\"can_opendir_ext0\":%s,"
+                   "\"can_opendir_ext0_homebrew\":%s,"
+                   "\"can_write_data_file_explorer\":%s,"
+                   "\"can_write_user_app\":%s,"
+                   "\"launcher_status\":\"%s\","
+                   "\"last_errno\":%d,"
+                   "\"checkpoint\":\"%s\","
+                   "\"core_server_started\":%s,"
+                   "\"launcher_attempted\":%s,"
+                   "\"appinst_init_rc\":%d,"
+                   "\"title_dir_resolved\":%s,"
+                   "\"install_title_rc\":%d,"
+                   "\"install_all_rc\":%d,"
+                   "\"uninstall_rc\":%d,"
+                   "\"launcher_final_state\":\"%s\","
+                   "\"rcs\":{"
+                   "\"sceNetCtlInit\":%d,"
+                   "\"sceUserServiceInitialize\":%d,"
+                   "\"notification_test\":%d,"
+                   "\"bind_5905\":%d,"
+                   "\"listen_5905\":%d},"
+                   "\"launcher\":{"
+                   "\"status\":\"%s\","
+                   "\"status_rc\":%d,"
+                   "\"compiled\":%s,"
+                   "\"disabled\":%s,"
+                   "\"launcher_enabled\":%s,"
+                   "\"launcher_attempted\":%s,"
+                   "\"appinst_init_rc\":%d,"
+                   "\"title_dir_resolved\":%s,"
+                   "\"install_title_dir_resolved\":%s,"
+                   "\"install_title_rc\":%d,"
+                   "\"uninstall_resolved\":%s,"
+                   "\"uninstall_rc\":%d,"
+                   "\"install_all_resolved\":%s,"
+                   "\"install_all_rc\":%d,"
+                   "\"user_app_writable\":%s,"
+                   "\"launcher_install_rc\":%d,"
+                   "\"launcher_final_state\":\"%s\"},"
+                   "\"notifications\":{\"mode\":\"optional-raw-debug\"},"
+                   "\"routes\":[\"/\",\"/api/status\",\"/api/diag\","
+                   "\"/fs\",\"/api/fs/*\"]}",
+                   VERSION_TAG, BUILD_VERSION, BFPILOT_BUILD_MODE,
+                   (long)getpid(), (long)now,
+                   bfpilot_diag_uptime(),
+                   cwd_json,
+                   json_bool(can_stat_root),
+                   json_bool(can_opendir_data),
+                   json_bool(can_opendir_data_homebrew),
+                   json_bool(can_opendir_usb0),
+                   json_bool(can_opendir_ext0),
+                   json_bool(can_opendir_ext0_homebrew),
+                   json_bool(can_write_data),
+                   json_bool(can_write_user_app),
+                   launcher_status_json,
+                   last_errno,
+                   checkpoint_json,
+                   json_bool(core_server_started),
+                   json_bool(g_launcher_diag.launcher_attempted),
+                   g_launcher_diag.appinst_init_rc,
+                   json_bool(g_launcher_diag.title_dir_resolved),
+                   g_launcher_diag.install_title_rc,
+                   g_launcher_diag.install_all_rc,
+                   g_launcher_diag.uninstall_rc,
+                   launcher_final_json,
+                   bfpilot_diag_netctl_rc(),
+                   bfpilot_diag_user_service_rc(),
+                   bfpilot_diag_notification_rc(),
+                   bfpilot_diag_bind_rc(),
+                   bfpilot_diag_listen_rc(),
+                   launcher_status_json,
+                   bfpilot_diag_launcher_rc(),
+                   json_bool(BFPILOT_ENABLE_LAUNCHER),
+                   json_bool(g_launcher_runtime_disabled),
+                   json_bool(g_launcher_diag.launcher_enabled),
+                   json_bool(g_launcher_diag.launcher_attempted),
+                   g_launcher_diag.appinst_init_rc,
+                   json_bool(g_launcher_diag.title_dir_resolved),
+                   json_bool(g_launcher_diag.install_title_dir_resolved),
+                   g_launcher_diag.install_title_rc,
+                   json_bool(g_launcher_diag.uninstall_resolved),
+                   g_launcher_diag.uninstall_rc,
+                   json_bool(g_launcher_diag.install_all_resolved),
+                   g_launcher_diag.install_all_rc,
+                   json_tristate(g_launcher_diag.user_app_writable),
+                   g_launcher_diag.launcher_install_rc,
+                   launcher_final_json);
   if(n < 0) return -1;
   if((size_t)n >= sizeof(body)) n = (int)sizeof(body) - 1;
   return websrv_send(req->fd, 200, "application/json", body, (size_t)n);
@@ -315,6 +515,9 @@ dispatch_request(const http_request_t *req, const char *initial_body,
     }
     if(!strcmp(req->path, "/api/status") || !strcmp(req->path, "/api/version")) {
       return status_request(req);
+    }
+    if(!strcmp(req->path, "/api/diag")) {
+      return diag_request(req);
     }
     if(!strcmp(req->path, "/api/control/shutdown")) {
       return shutdown_request(req);
@@ -424,7 +627,10 @@ client_thread(void *arg) {
   const char *initial = buf + header_end;
   if(initial_size > content_size) initial_size = content_size;
 
-  dispatch_request(&req, initial, initial_size, content_size);
+  int dispatch_rc = dispatch_request(&req, initial, initial_size, content_size);
+  if(dispatch_rc == 0) {
+    bfpilot_diag_mark_first_http(req.method, req.path);
+  }
 
 done:
   free(buf);
@@ -445,6 +651,8 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
   srvfd = socket(AF_INET, SOCK_STREAM, 0);
   if(srvfd < 0) {
     int err = errno;
+    bfpilot_diag_set_last_errno(err);
+    bfpilot_log("socket port %u failed errno=%d", (unsigned int)port, err);
     perror("socket");
     return -err;
   }
@@ -452,6 +660,9 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
   int on = 1;
   if(setsockopt(srvfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
     int err = errno;
+    bfpilot_diag_set_last_errno(err);
+    bfpilot_log("setsockopt SO_REUSEADDR port %u failed errno=%d",
+                (unsigned int)port, err);
     perror("setsockopt");
     close(srvfd);
     return -err;
@@ -468,17 +679,29 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
 
   if(bind(srvfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) != 0) {
     int err = errno;
+    bfpilot_diag_set_last_errno(err);
+    bfpilot_diag_set_bind_rc(-err);
+    bfpilot_log("bind port %u rc=%d errno=%d",
+                (unsigned int)port, -err, err);
     perror("bind");
     close(srvfd);
     return -err;
   }
+  bfpilot_diag_set_bind_rc(0);
+  bfpilot_log("bind port %u rc=0", (unsigned int)port);
 
   if(listen(srvfd, 16) != 0) {
     int err = errno;
+    bfpilot_diag_set_last_errno(err);
+    bfpilot_diag_set_listen_rc(-err);
+    bfpilot_log("listen port %u rc=%d errno=%d",
+                (unsigned int)port, -err, err);
     perror("listen");
     close(srvfd);
     return -err;
   }
+  bfpilot_diag_set_listen_rc(0);
+  bfpilot_log("listen port %u rc=0 backlog=16", (unsigned int)port);
 
   pthread_mutex_lock(&g_websrv_lock);
   g_websrv_srvfd = srvfd;
@@ -496,6 +719,8 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
         continue;
       }
       int err = errno;
+      bfpilot_diag_set_last_errno(err);
+      bfpilot_log("accept failed errno=%d", err);
       perror("accept");
 
       pthread_mutex_lock(&g_websrv_lock);

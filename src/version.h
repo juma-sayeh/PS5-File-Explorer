@@ -5,9 +5,30 @@
 #pragma once
 
 #ifndef VERSION_TAG
-#define VERSION_TAG "file-explorer-v0.2.0"
+#define VERSION_TAG "file-explorer-v0.2.1"
 #endif
 
 #ifndef BUILD_VERSION
 #define BUILD_VERSION "dev"
+#endif
+
+#ifndef BFPILOT_SDK_PATH
+#define BFPILOT_SDK_PATH "unknown"
+#endif
+
+#ifndef BFPILOT_ENABLE_LAUNCHER
+#define BFPILOT_ENABLE_LAUNCHER 1
+#endif
+
+#ifndef BFPILOT_DISABLE_LAUNCHER
+#define BFPILOT_DISABLE_LAUNCHER 0
+#endif
+
+#if BFPILOT_DISABLE_LAUNCHER
+#undef BFPILOT_ENABLE_LAUNCHER
+#define BFPILOT_ENABLE_LAUNCHER 0
+#endif
+
+#ifndef BFPILOT_BUILD_MODE
+#define BFPILOT_BUILD_MODE "full"
 #endif
