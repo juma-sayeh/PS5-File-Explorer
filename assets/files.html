@@ -86,9 +86,11 @@
       color: var(--red);
     }
 
-    button.warn {
-      border-color: #8a6f2d;
-      background: var(--gold);
+    button.active {
+      border-color: var(--deep-2);
+      background: var(--mint);
+      color: var(--deep);
+      font-weight: 700;
     }
 
     .top {
@@ -158,7 +160,7 @@
       margin: 0 auto;
       padding: 14px;
       display: grid;
-      grid-template-columns: 150px minmax(0, 1fr) 300px;
+      grid-template-columns: 372px minmax(0, 1fr) 300px;
       gap: 12px;
       min-height: 0;
     }
@@ -178,17 +180,58 @@
       padding: 10px;
       align-self: start;
       display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+      max-height: calc(100vh - 108px);
+      overflow: hidden;
+    }
+
+    .side-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0c1219;
+    }
+
+    .side-tabs button {
+      min-height: 32px;
+      justify-content: center;
+      padding: 0 8px;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .side-tabs button.active {
+      border-color: var(--deep-2);
+      background: var(--mint);
+      color: var(--deep);
+      font-weight: 800;
+    }
+
+    .side-pane {
+      min-height: 0;
+      min-width: 0;
+      display: none;
+      overflow: auto;
+    }
+
+    .side-pane.active {
+      display: grid;
+      align-content: start;
       gap: 8px;
     }
 
-    .rail button {
+    .places-list button {
       width: 100%;
       justify-content: flex-start;
       text-align: left;
       background: var(--soft);
     }
 
-    .rail button.active {
+    .places-list button.active {
       border-color: var(--deep-2);
       background: var(--mint);
       color: var(--deep);
@@ -224,10 +267,57 @@
 
     .actions {
       display: flex;
+      align-items: center;
       gap: 8px;
       overflow-x: auto;
       padding: 9px 10px;
       border-bottom: 1px solid var(--line);
+    }
+
+    .actions button {
+      flex: 0 0 auto;
+    }
+
+    button.upload-action {
+      min-width: 112px;
+      display: inline-grid;
+      grid-template-columns: 18px minmax(0, auto);
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-color: #24554c;
+      background: #102a26;
+      color: #b9f4dd;
+      font-weight: 700;
+    }
+
+    button.upload-action.archive {
+      border-color: #4d4774;
+      background: #19182c;
+      color: #dcd3ff;
+    }
+
+    button.upload-action:hover:not(:disabled),
+    button.upload-action:focus-visible {
+      background: #163a33;
+      color: #ecfff7;
+    }
+
+    button.upload-action.archive:hover:not(:disabled),
+    button.upload-action.archive:focus-visible {
+      background: #22203d;
+      color: #f3f0ff;
+    }
+
+    button.upload-action svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .count {
@@ -243,7 +333,6 @@
     .file-head,
     .file-row {
       display: grid;
-      grid-template-columns: 42px minmax(0, 1fr) 92px 112px;
       gap: 8px;
       align-items: center;
     }
@@ -252,6 +341,7 @@
       position: sticky;
       top: 0;
       z-index: 1;
+      grid-template-columns: 34px minmax(0, 1fr) 92px 112px 72px;
       min-height: 34px;
       padding: 0 12px;
       background: var(--panel-2);
@@ -267,6 +357,8 @@
     }
 
     .file-row {
+      position: relative;
+      grid-template-columns: minmax(0, 1fr) 72px;
       min-height: 42px;
       padding: 0 12px;
       border-bottom: 1px solid #202a36;
@@ -278,31 +370,196 @@
       background: #172231;
     }
 
+    .file-row:focus-within {
+      position: relative;
+      z-index: 2;
+      background: #172231;
+      box-shadow: inset 0 0 0 2px var(--deep-2), 0 0 0 3px var(--focus);
+      outline: none;
+    }
+
     .file-row.selected {
       background: var(--sky);
+    }
+
+    .file-row.selected:focus-within {
+      background: #173d54;
     }
 
     .file-row.parent {
       color: var(--muted);
     }
 
-    .tag {
+    .row-main {
       min-width: 0;
-      display: inline-flex;
-      justify-content: center;
-      border-radius: 5px;
-      border: 1px solid var(--line);
-      background: var(--soft);
-      color: var(--muted);
-      padding: 3px 0;
-      font-size: 11px;
-      font-weight: 700;
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 92px 112px;
+      gap: 8px;
+      align-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
     }
 
-    .file-row.dir .tag {
-      border-color: #27724e;
-      background: var(--mint);
+    .row-main:hover,
+    .row-main:focus-visible {
+      background: transparent;
+      color: inherit;
+      box-shadow: none;
+      outline: none;
+    }
+
+    .icon-cell {
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    .icon-cell svg,
+    .row-more svg,
+    .backup-indicator svg,
+    .row-menu svg,
+    .new-folder-inline svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .file-row.dir .icon-cell {
       color: var(--deep);
+    }
+
+    .file-row.new-folder-inline .icon-cell {
+      color: var(--deep-2);
+    }
+
+    .row-actions {
+      position: relative;
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .toolbar-actions {
+      flex: 0 0 auto;
+    }
+
+    .row-more,
+    .backup-indicator {
+      width: 30px;
+      height: 30px;
+      min-height: 30px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .row-more:hover,
+    .row-more:focus-visible,
+    .backup-indicator:hover,
+    .backup-indicator:focus-visible {
+      color: var(--ink);
+      background: var(--soft);
+    }
+
+    .backup-indicator {
+      color: #85f2bf;
+      border-color: rgba(133, 242, 191, .28);
+      background: rgba(47, 184, 125, .1);
+    }
+
+    .row-menu {
+      position: absolute;
+      right: 0;
+      top: 34px;
+      z-index: 5;
+      width: 150px;
+      display: none;
+      gap: 4px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      box-shadow: 0 12px 26px var(--shadow);
+    }
+
+    .row-menu.open {
+      display: grid;
+    }
+
+    .row-menu button {
+      min-height: 32px;
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      text-align: left;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .row-menu button:hover,
+    .row-menu button:focus-visible {
+      border-color: var(--deep-2);
+      background: var(--soft);
+    }
+
+    .row-menu button.danger {
+      color: var(--red);
+    }
+
+    .backup-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .backup-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0c1219;
+    }
+
+    .backup-item strong,
+    .backup-item span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .backup-item span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar-menu {
+      position: fixed;
+      right: auto;
+      top: 36px;
+      z-index: 20;
     }
 
     .name,
@@ -404,6 +661,286 @@
       color: var(--muted);
     }
 
+    .log-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 2px 0 0;
+    }
+
+    .log-toolbar .spacer {
+      flex: 1 1 auto;
+    }
+
+    .log-toolbar button {
+      min-height: 30px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+
+    .log-list {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .log-entry {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 9px;
+      align-items: center;
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+    }
+
+    .log-entry:hover,
+    .log-entry:focus-visible {
+      border-color: #39506a;
+      background: #172231;
+      color: var(--ink);
+    }
+
+    .log-entry.selected {
+      border-color: var(--deep-2);
+      background: #102839;
+    }
+
+    .log-entry.owned {
+      border-color: #d99b32;
+      box-shadow: inset 4px 0 0 #d99b32, 0 0 0 1px rgba(217, 155, 50, .24);
+      background: #1c1d19;
+    }
+
+    .log-entry.owned.queued {
+      border-color: #5faadc;
+      box-shadow: inset 4px 0 0 #8fd3ff, 0 0 0 1px rgba(143, 211, 255, .26);
+      background: #101f2c;
+    }
+
+    .log-entry.owned.running {
+      border-color: #d99b32;
+      box-shadow: inset 4px 0 0 #ffd36a, 0 0 0 1px rgba(255, 211, 106, .26);
+      background: #211b12;
+      animation: owned-running-pulse 2.4s ease-in-out infinite;
+    }
+
+    .log-entry.owned.selected {
+      border-color: var(--deep-2);
+    }
+
+    @keyframes owned-running-pulse {
+      0%,
+      100% {
+        border-color: #d99b32;
+        box-shadow: inset 4px 0 0 #ffd36a, 0 0 0 1px rgba(255, 211, 106, .22);
+        background: #211b12;
+      }
+
+      50% {
+        border-color: #e9b54d;
+        box-shadow: inset 4px 0 0 #ffe19a, 0 0 0 2px rgba(255, 211, 106, .36);
+        background: #261f15;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .log-entry.owned.running {
+        animation: none;
+      }
+    }
+
+    .log-status-icon {
+      width: 28px;
+      height: 28px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #101922;
+    }
+
+    .log-status-icon svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .log-entry.success .log-status-icon {
+      color: #85f2bf;
+      background: rgba(47, 184, 125, .14);
+    }
+
+    .log-entry.failed .log-status-icon {
+      color: #ff9aa8;
+      background: rgba(255, 105, 124, .14);
+    }
+
+    .log-entry.running .log-status-icon {
+      color: #ffd36a;
+      background: rgba(255, 211, 106, .14);
+    }
+
+    .log-entry.queued .log-status-icon {
+      color: #8fd3ff;
+      background: rgba(80, 160, 220, .14);
+    }
+
+    .log-entry.cancelled .log-status-icon,
+    .log-entry.abandoned .log-status-icon {
+      color: #c3c9d1;
+      background: rgba(180, 190, 205, .12);
+    }
+
+    .log-result {
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+
+    .log-entry.success .log-result {
+      color: #85f2bf;
+    }
+
+    .log-entry.failed .log-result {
+      color: #ff9aa8;
+    }
+
+    .log-entry.running .log-result {
+      color: #ffd36a;
+    }
+
+    .log-entry.queued .log-result {
+      color: #8fd3ff;
+    }
+
+    .log-entry.cancelled .log-result,
+    .log-entry.abandoned .log-result {
+      color: #c3c9d1;
+    }
+
+    .log-main {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .log-main strong,
+    .log-main span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .log-main span,
+    .log-time {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .log-time {
+      white-space: nowrap;
+    }
+
+    .activity-warning {
+      color: #ffd36a;
+    }
+
+    .activity-meter {
+      height: 5px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #101922;
+    }
+
+    .activity-meter span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--deep), #85f2bf);
+    }
+
+    .log-content {
+      margin: 8px 0 0;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      border-top: 1px solid #25313e;
+      padding-top: 8px;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #d9e8f4;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #25313e;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(5, 8, 12, .72);
+    }
+
+    .modal-card {
+      width: min(720px, 100%);
+      max-height: min(760px, calc(100vh - 36px));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .45);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .modal-head strong {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .modal-head .spacer {
+      flex: 1 1 auto;
+    }
+
+    .modal-body {
+      min-width: 0;
+      overflow: auto;
+      padding: 12px;
+    }
+
     .job {
       position: fixed;
       left: 50%;
@@ -422,6 +959,16 @@
       display: grid;
     }
 
+    .job.owner {
+      border-color: #d99b32;
+      background: #211b12;
+    }
+
+    .job.watcher {
+      border-color: #326a96;
+      background: #121d25;
+    }
+
     .meter {
       height: 10px;
       border: 1px solid var(--line);
@@ -434,6 +981,37 @@
       width: 0;
       height: 100%;
       background: linear-gradient(90deg, var(--deep), #85f2bf);
+    }
+
+    .job.owner .meter-fill {
+      background: linear-gradient(90deg, #d99b32, #ffd37a);
+    }
+
+    .job.watcher .meter-fill {
+      background: linear-gradient(90deg, #326a96, #8fd3ff);
+    }
+
+    .job-note {
+      grid-column: 1 / -1;
+      display: none;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .job-note.show {
+      display: block;
+    }
+
+    .job.owner .job-note {
+      background: #33240f;
+      color: #ffd37a;
+    }
+
+    .job.watcher .job-note {
+      background: #142b3c;
+      color: #9edaff;
     }
 
     .job-text {
@@ -478,7 +1056,7 @@
 
     @media (max-width: 1080px) {
       .shell {
-        grid-template-columns: 132px minmax(0, 1fr);
+        grid-template-columns: 330px minmax(0, 1fr);
       }
 
       .target {
@@ -508,13 +1086,11 @@
       }
 
       .rail {
-        display: flex;
-        overflow-x: auto;
+        max-height: none;
       }
 
-      .rail button {
-        width: auto;
-        flex: 0 0 auto;
+      .side-pane.active {
+        max-height: 220px;
       }
 
       .pathbar {
@@ -531,10 +1107,27 @@
 
       .file-head,
       .file-row {
-        grid-template-columns: 40px minmax(0, 1fr) 78px;
+        grid-template-columns: 30px minmax(0, 1fr) 72px 34px;
+      }
+
+      .file-row {
+        grid-template-columns: minmax(0, 1fr) 34px;
+      }
+
+      .row-main {
+        grid-template-columns: 30px minmax(0, 1fr) 72px;
+      }
+
+      .log-entry {
+        grid-template-columns: 32px minmax(0, 1fr);
+      }
+
+      .log-time {
+        white-space: normal;
       }
 
       .file-head span:last-child,
+      .file-head span:nth-child(4),
       .file-row .mtime {
         display: none;
       }
@@ -571,7 +1164,14 @@
   </header>
 
   <main class="shell">
-    <nav class="rail" id="places" aria-label="Places"></nav>
+    <aside class="rail" aria-label="Side panel">
+      <div class="side-tabs" role="tablist" aria-label="Side panel content">
+        <button id="side-common-tab" class="active" type="button" data-side-mode="paths">Common Paths</button>
+        <button id="side-logs-tab" type="button" data-side-mode="activity">Activity</button>
+      </div>
+      <nav class="side-pane places-list active" id="places" aria-label="Common paths"></nav>
+      <section class="side-pane" id="side-logs" aria-label="Activity"></section>
+    </aside>
 
     <section class="browser" aria-label="Files">
       <div class="pathbar">
@@ -582,21 +1182,22 @@
       </div>
 
       <div class="actions">
-        <button id="new-folder">New Folder</button>
-        <button id="rename">Rename</button>
-        <button id="download">Download</button>
-        <button id="upload-files" class="warn">Upload Files</button>
-        <button id="upload-folder" class="warn">Upload Folder</button>
-        <button id="delete" class="danger">Delete</button>
+        <button id="multi-select" aria-pressed="false">Multi Select</button>
+        <button id="upload-files" class="upload-action" data-icon="upload-file">Upload Files</button>
+        <button id="upload-folder" class="upload-action" data-icon="upload-folder">Upload Folder</button>
+        <button id="upload-zip" class="upload-action archive" data-icon="upload-zip">Upload Zip</button>
+        <button id="upload-rar" class="upload-action archive" data-icon="upload-rar">Upload RAR</button>
         <span id="selection" class="count">0 selected</span>
+        <span id="bulk-actions" class="row-actions toolbar-actions"></span>
       </div>
 
       <div class="list" id="list">
         <div class="file-head">
-          <span>Kind</span>
+          <span></span>
           <span>Name</span>
           <span>Type</span>
           <span>Modified</span>
+          <span></span>
         </div>
       </div>
     </section>
@@ -625,11 +1226,25 @@
     <strong id="job-verb">Working</strong>
     <div class="meter"><div id="job-fill" class="meter-fill"></div></div>
     <button id="job-cancel">Cancel</button>
+    <span id="job-note" class="job-note"></span>
     <span id="job-text" class="job-text"></span>
   </section>
 
+  <div id="log-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+    <section class="modal-card">
+      <div class="modal-head">
+        <strong id="log-modal-title">Operation Log</strong>
+        <span class="spacer"></span>
+        <button id="log-modal-close" type="button">Close</button>
+      </div>
+      <div id="log-modal-body" class="modal-body"></div>
+    </section>
+  </div>
+
   <input id="file-picker" class="hidden" type="file" multiple>
   <input id="folder-picker" class="hidden" type="file" multiple webkitdirectory directory>
+  <input id="zip-picker" class="hidden" type="file" accept=".zip,application/zip,application/x-zip-compressed">
+  <input id="rar-picker" class="hidden" type="file" multiple>
   <div id="toast" class="toast"></div>
 
   <script>
@@ -640,16 +1255,50 @@
       ['User', '/user'],
       ['System', '/system_data']
     ];
+    const UPLOAD_CONCURRENCY = 4;
+    const UPLOAD_CHUNK_CONCURRENCY = 4;
+    const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+    const UPLOAD_CHUNK_THRESHOLD = 32 * 1024 * 1024;
+    const UPLOAD_PROGRESS_INTERVAL = 150;
+    const ZIP_EOCD_MAX = 22 + 65535;
+    const ZIP_CENTRAL_DIR_MAX = 64 * 1024 * 1024;
+    const ZIP_FLAG_ENCRYPTED = 0x0001;
+    const ZIP_FLAG_DATA_DESCRIPTOR = 0x0008;
+    const ZIP_FLAG_UTF8 = 0x0800;
+    const ZIP_METHOD_STORE = 0;
+    const ZIP_METHOD_DEFLATE = 8;
+    const RAR_UPLOAD_MAGIC = 'BFPRAR01';
+    const RAR_VOLUME_MAX = 128;
+    const LAST_PATH_COOKIE = 'bfpilot_last_path';
+    const ACTIVITY_CLIENT_KEY = 'bfpilot_activity_client_id';
+    const ACTIVITY_POLL_MS = 1200;
 
     const state = {
       path: '/data',
       entries: [],
       selected: new Set(),
       detailToken: 0,
+      controllerMulti: false,
+      squareToggleHeld: false,
+      multiSelectLock: false,
       uploadBusy: false,
       uploadAbort: false,
-      uploadXhr: null,
-      jobTimer: 0
+      uploadJobCancel: false,
+      uploadJobVerb: '',
+      uploadXhrs: new Set(),
+      jobTimer: 0,
+      sideMode: 'paths',
+      logs: [],
+      selectedLog: '',
+      logRefreshTimer: 0,
+      activityPollTimer: 0,
+      clientId: '',
+      localQueue: new Map(),
+      localIdSeq: 1,
+      activeQueueId: '',
+      activeLeaseToken: '',
+      activeActivityProgressAt: 0,
+      lastBackgroundWarningAt: 0
     };
 
     function el(id) {
@@ -659,6 +1308,27 @@
     function cleanPath(path) {
       if (!path || path[0] !== '/') return '/';
       return path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    }
+
+    function cookieValue(name) {
+      const prefix = name + '=';
+      const parts = document.cookie ? document.cookie.split(';') : [];
+      for (const part of parts) {
+        const item = part.trim();
+        if (item.indexOf(prefix) === 0) {
+          return decodeURIComponent(item.slice(prefix.length));
+        }
+      }
+      return '';
+    }
+
+    function saveLastPath(path) {
+      document.cookie = LAST_PATH_COOKIE + '=' + encodeURIComponent(cleanPath(path)) +
+        '; max-age=15552000; path=/';
+    }
+
+    function loadLastPath() {
+      return cleanPath(cookieValue(LAST_PATH_COOKIE) || '/data');
     }
 
     function parentPath(path) {
@@ -677,6 +1347,18 @@
       return '/fs' + cleanPath(path).split('/').map(encodeURIComponent).join('/');
     }
 
+    function localArchiveKind(name) {
+      const lower = String(name || '').toLowerCase();
+      if (lower.endsWith('.zip')) return 'zip';
+      if (lower.endsWith('.part001.rar')) return 'rar';
+      if (lower.endsWith('.rar') && !/\.part\d+\.rar$/.test(lower)) return 'rar';
+      return '';
+    }
+
+    function backupCount(entry) {
+      return Math.max(0, Number(entry && entry.backups || 0));
+    }
+
     function api(url) {
       return fetch(url, { cache: 'no-store' }).then(async (response) => {
         const body = await response.json().catch(() => ({}));
@@ -687,6 +1369,44 @@
       });
     }
 
+    function isCancelledError(message) {
+      return /^(upload cancelled|cancelled)$/i.test(String(message || '').trim());
+    }
+
+    function activityClientId() {
+      if (state.clientId) return state.clientId;
+      let value = '';
+      try {
+        value = sessionStorage.getItem(ACTIVITY_CLIENT_KEY) || '';
+      } catch (err) {}
+      if (!/^[A-Za-z0-9._:-]{1,95}$/.test(value)) {
+        const random = window.crypto && crypto.randomUUID ?
+          crypto.randomUUID().replace(/[^A-Za-z0-9]/g, '') :
+          String(Date.now()) + String(Math.random()).slice(2);
+        value = 'tab-' + random.slice(0, 48);
+        try {
+          sessionStorage.setItem(ACTIVITY_CLIENT_KEY, value);
+        } catch (err) {}
+      }
+      state.clientId = value;
+      return value;
+    }
+
+    function nextLocalId(kind) {
+      return String(kind || 'item') + '-' + Date.now().toString(36) + '-' +
+        (state.localIdSeq++).toString(36);
+    }
+
+    function activityOwnedIds() {
+      return Array.from(state.localQueue.keys()).filter(Boolean).join(',');
+    }
+
+    function activityLeaseExtra(queue) {
+      if (!queue || !queue.queueId || !queue.leaseToken) return '';
+      return '&queueId=' + encodeURIComponent(queue.queueId) +
+        '&leaseToken=' + encodeURIComponent(queue.leaseToken);
+    }
+
     function toast(message, kind) {
       const box = el('toast');
       box.textContent = message;
@@ -695,6 +1415,10 @@
       box._timer = setTimeout(() => {
         box.className = 'toast';
       }, 3200);
+      if ((kind === 'ok' || kind === 'err') &&
+          !/^(activity|clear activity|logs|clear logs):/i.test(message || '')) {
+        scheduleLogsReveal();
+      }
     }
 
     function sortEntries(entries) {
@@ -743,6 +1467,29 @@
       return new Date(seconds * 1000).toLocaleString();
     }
 
+    function pollControllerState() {
+      let multi = false;
+      let squarePressed = false;
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const pad of pads) {
+        if (!pad || !pad.buttons) continue;
+        const r2 = pad.buttons[7];
+        if (r2 && (r2.pressed || r2.value > 0.45)) {
+          multi = true;
+        }
+        const square = pad.buttons[2];
+        if (square && (square.pressed || square.value > 0.45)) {
+          squarePressed = true;
+        }
+      }
+      if (squarePressed && !state.squareToggleHeld) {
+        toggleMultiSelectLock();
+      }
+      state.squareToggleHeld = squarePressed;
+      state.controllerMulti = multi;
+      requestAnimationFrame(pollControllerState);
+    }
+
     function jobProgressText(job) {
       const copied = Number(job.copiedBytes || 0);
       const total = Number(job.totalBytes || 0);
@@ -785,6 +1532,33 @@
       return parts.join(' | ');
     }
 
+    function isOwnRarUpload() {
+      return state.uploadBusy && state.uploadJobVerb === 'unrar';
+    }
+
+    function updateJobRole(job) {
+      const box = el('job');
+      const note = el('job-note');
+      const jobBusy = !job || job.busy !== false;
+      const isRarJob = ((job && job.busy && job.verb === 'unrar') ||
+        (isOwnRarUpload() && jobBusy));
+
+      box.classList.remove('owner', 'watcher');
+      note.classList.remove('show');
+      note.textContent = '';
+
+      if (!isRarJob) return;
+
+      if (isOwnRarUpload()) {
+        box.classList.add('owner');
+        note.textContent = 'Uploading RAR and extracting. Do not close this tab until the operation completes.';
+      } else {
+        box.classList.add('watcher');
+        note.textContent = 'Watching RAR upload from another tab. Safe to close this tab; leave the uploading tab open.';
+      }
+      note.classList.add('show');
+    }
+
     function setJobBox(verb, text, pct) {
       if (state.jobTimer) {
         clearInterval(state.jobTimer);
@@ -794,9 +1568,10 @@
       el('job-verb').textContent = verb || 'Working';
       el('job-text').textContent = text || '';
       el('job-fill').style.width = Math.max(0, Math.min(100, pct || 0)).toFixed(1) + '%';
+      updateJobRole({ busy: true, verb: verb || '' });
     }
 
-    function uploadProgressText(doneBytes, totalBytes, startedAt, index, count, name, failed, cancelling) {
+    function uploadProgressText(doneBytes, totalBytes, startedAt, doneFiles, count, name, failed, cancelling) {
       const elapsed = Math.max(0, (Date.now() - startedAt) / 1000);
       const speed = elapsed > 0 && doneBytes > 0 ? doneBytes / elapsed : 0;
       const pct = totalBytes > 0 ? Math.max(0, Math.min(100, (doneBytes / totalBytes) * 100)) : 0;
@@ -809,7 +1584,7 @@
         parts.push('Preparing');
       }
 
-      parts.push(Math.min(index + 1, count) + ' / ' + count + ' files');
+      parts.push(Math.min(doneFiles, count) + ' / ' + count + ' files');
       if (speed > 0) {
         parts.push(speedMBps(speed));
         if (totalBytes > doneBytes) {
@@ -870,12 +1645,1088 @@
       }
     }
 
+
+    function setSideMode(mode) {
+      state.sideMode = (mode === 'activity' || mode === 'logs') ? 'activity' : 'paths';
+      document.querySelectorAll('[data-side-mode]').forEach((button) => {
+        const active = button.dataset.sideMode === state.sideMode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      el('places').classList.toggle('active', state.sideMode === 'paths');
+      el('side-logs').classList.toggle('active', state.sideMode === 'activity');
+    }
+
+
+    function scheduleLogsReveal() {
+      if (!el('side-logs')) return;
+      if (state.logRefreshTimer) clearTimeout(state.logRefreshTimer);
+      state.logRefreshTimer = setTimeout(() => {
+        state.logRefreshTimer = 0;
+        refreshLogs({ activate: true, preserveSelection: true, quiet: true });
+      }, 350);
+    }
+
+
+    function logStatusSvg(result) {
+      if (result === 'success') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>';
+      }
+      if (result === 'running') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>';
+      }
+      if (result === 'queued') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path></svg>';
+      }
+      if (result === 'cancelled' || result === 'abandoned') {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M8 12h8"></path></svg>';
+      }
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg>';
+    }
+
+
+    function logResultLabel(result) {
+      if (result === 'queued') return 'Queued';
+      if (result === 'success') return 'Finished';
+      if (result === 'running') return 'Running';
+      if (result === 'failed') return 'Failed';
+      if (result === 'cancelled') return 'Cancelled';
+      if (result === 'abandoned') return 'Abandoned';
+      return result || 'Unknown';
+    }
+
+
+    function activityStatus(item) {
+      return (item && (item.status || item.result)) || 'unknown';
+    }
+
+
+    function activityKindLabel(kind) {
+      kind = String(kind || '').toLowerCase();
+      if (kind === 'rar' || kind === 'unrar') return 'RAR';
+      if (kind === 'zip' || kind === 'unzip') return 'ZIP';
+      if (kind === 'upload') return 'Upload';
+      if (kind === 'copy') return 'Copy';
+      if (kind === 'move') return 'Move';
+      if (kind === 'delete') return 'Delete';
+      if (kind === 'chmod') return 'Permissions';
+      if (kind === 'mkdir') return 'Folder';
+      if (kind === 'rename') return 'Rename';
+      return kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : 'Activity';
+    }
+
+
+    function activityPercent(item) {
+      const copied = Number((item && (item.copiedBytes || item.progress)) || 0);
+      const total = Number((item && item.totalBytes) || 0);
+      return total > 0 ? Math.max(0, Math.min(100, (copied / total) * 100)) : 0;
+    }
+
+
+    function activityMeta(item) {
+      const status = activityStatus(item);
+      const parts = [logResultLabel(status)];
+      const copied = Number(item.copiedBytes || item.progress || 0);
+      const total = Number(item.totalBytes || 0);
+      const done = Number(item.doneItems || 0);
+      const totalItems = Number(item.totalItems || 0);
+      const failed = Number(item.failedItems || 0);
+      if (status === 'queued' && Number(item.position || 0) > 0) {
+        parts.push('position ' + Number(item.position));
+      }
+      if (total > 0) {
+        parts.push(shortSize(copied) + ' / ' + shortSize(total));
+        parts.push(activityPercent(item).toFixed(1) + '%');
+      }
+      if (totalItems > 0) {
+        parts.push(Math.min(done, totalItems) + ' / ' + totalItems + ' items');
+      }
+      if (failed > 0) parts.push(failed + ' failed');
+      const stamp = Number(item.updatedAt || item.mtime || item.createdAt || 0);
+      if (stamp > 0) parts.push(formatDate(stamp));
+      return parts.join(' | ');
+    }
+
+
+    function activityWarning(item) {
+      if (!item || item.source === 'log') return '';
+      const status = activityStatus(item);
+      if (item.owned && status === 'queued') {
+        return 'Keep this tab open or this queued item will be removed.';
+      }
+      if (item.owned && status === 'running') {
+        const kind = String(item.kind || '').toLowerCase();
+        if (kind === 'rar' || kind === 'zip') {
+          return 'Uploading and extracting. Do not close this tab.';
+        }
+        return 'Uploading. Do not close this tab.';
+      }
+      if (!item.owned && status === 'running') {
+        return 'Running from another tab. Safe to close this tab.';
+      }
+      if (!item.owned && status === 'queued') {
+        return 'Queued by another tab.';
+      }
+      return '';
+    }
+
+
+    function activityCreatedAt(item) {
+      return Number((item && (item.createdAt || item.mtime || item.updatedAt)) || 0);
+    }
+
+
+    function sortActivityItems(items) {
+      return Array.from(items || []).sort((a, b) => {
+        const at = activityCreatedAt(a);
+        const bt = activityCreatedAt(b);
+        if (at !== bt) return bt - at;
+        return String(b.queueId || b.name || '').localeCompare(String(a.queueId || a.name || ''));
+      });
+    }
+
+
+    function parseOperationLog(content) {
+      const fields = {};
+      String(content || '').split(/\r?\n/).forEach((line) => {
+        const index = line.indexOf(':');
+        if (index <= 0) return;
+        fields[line.slice(0, index)] = line.slice(index + 1).trim();
+      });
+      return fields;
+    }
+
+
+    function formatLogEpoch(value) {
+      const seconds = Number(value || 0);
+      return seconds > 0 ? formatDate(seconds) : '-';
+    }
+
+
+    function formatLogBytes(value) {
+      const match = /^\s*(-?\d+)\s*\/\s*(-?\d+)\s*$/.exec(value || '');
+      if (!match) return value || '-';
+      const copied = Number(match[1]);
+      const total = Number(match[2]);
+      if (total <= 0 && copied <= 0) return '-';
+      return shortSize(copied) + ' / ' + shortSize(total);
+    }
+
+
+    function renderLogModal(log, content, truncated, loading) {
+      const modal = el('log-modal');
+      const body = el('log-modal-body');
+      const title = el('log-modal-title');
+      const fields = parseOperationLog(content);
+      const queueStatus = log && log.source !== 'log' ? activityStatus(log) : '';
+      const result = queueStatus && queueStatus !== 'unknown' ? queueStatus :
+        (fields.Result || activityStatus(log));
+      const operation = fields.Operation || activityKindLabel((log && (log.kind || log.operation)) || '');
+      const error = fields.Error || (log && log.error) || '';
+      const logName = (log && (log.logName || log.name)) || '-';
+
+      title.textContent = operation + ' - ' + logResultLabel(result);
+      body.textContent = '';
+
+      const rows = [
+        ['Result', logResultLabel(result)],
+        ['Operation', operation],
+        ['Target', fields.Target || (log && (log.target || log.destPath)) || '-'],
+        ['Name', (log && log.displayName) || '-'],
+        ['Queue ID', (log && log.source !== 'log' && log.queueId) || '-'],
+        ['Started', fields.Started ? formatLogEpoch(fields.Started) : formatDate(Number(log && log.startedAt || 0))],
+        ['Ended', fields.Ended ? formatLogEpoch(fields.Ended) : formatDate(Number(log && log.endedAt || 0))],
+        ['Duration', fields.DurationSeconds ? shortDuration(Number(fields.DurationSeconds)) : '-'],
+        ['Bytes', fields.Bytes ? formatLogBytes(fields.Bytes) :
+          (Number(log && log.totalBytes || 0) > 0 ?
+            shortSize(Number(log && log.copiedBytes || 0)) + ' / ' +
+            shortSize(Number(log && log.totalBytes || 0)) : '-')],
+        ['Items', fields.Items || (Number(log && log.totalItems || 0) > 0 ?
+          String(Number(log && log.doneItems || 0)) + ' / ' + String(Number(log && log.totalItems || 0)) : '-')],
+        ['Failed items', fields.FailedItems || String(Number(log && log.failedItems || 0))],
+        ['Current', fields.Current || '-'],
+        ['Log file', logName]
+      ];
+      if (error && error !== 'none') rows.splice(3, 0, ['Error', error]);
+
+      const grid = document.createElement('div');
+      grid.className = 'detail-grid';
+      rows.forEach((row) => grid.appendChild(detailRow(row[0], row[1])));
+      body.appendChild(grid);
+
+      const actions = document.createElement('div');
+      actions.className = 'modal-actions';
+      if (canCancelActivity(log)) {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'danger';
+        cancel.textContent = 'Cancel';
+        cancel.addEventListener('click', () => cancelActivity(log));
+        actions.appendChild(cancel);
+      }
+      if (canRetryActivity(log)) {
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'primary';
+        retry.textContent = 'Retry';
+        retry.addEventListener('click', () => retryActivity(log));
+        actions.appendChild(retry);
+      }
+      if (actions.childNodes.length) body.appendChild(actions);
+
+      const pre = document.createElement('pre');
+      pre.className = 'log-content';
+      pre.textContent = loading ? 'Loading log details...' :
+        (content || 'No detailed log body was returned.');
+      if (truncated) pre.textContent += '\n\n[truncated]';
+      body.appendChild(pre);
+
+      modal.classList.remove('hidden');
+    }
+
+
+    function closeLogModal() {
+      el('log-modal').classList.add('hidden');
+    }
+
+
+    function showLogsLoading() {
+      setSideMode('activity');
+      const root = el('side-logs');
+      root.textContent = '';
+      const toolbar = document.createElement('div');
+      toolbar.className = 'log-toolbar';
+      toolbar.textContent = 'Loading activity';
+      root.appendChild(toolbar);
+    }
+
+
+    function drawLogs() {
+      const root = el('side-logs');
+      root.textContent = '';
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'log-toolbar';
+      const title = document.createElement('strong');
+      title.textContent = 'Activity';
+      const spacer = document.createElement('span');
+      spacer.className = 'spacer';
+      const refreshButton = document.createElement('button');
+      refreshButton.type = 'button';
+      refreshButton.textContent = 'Refresh';
+      refreshButton.addEventListener('click', () => refreshLogs({
+        activate: true,
+        preserveSelection: true
+      }));
+      const clearButton = document.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'danger';
+      clearButton.textContent = 'Clear Finished';
+      clearButton.addEventListener('click', clearLogs);
+      toolbar.appendChild(title);
+      toolbar.appendChild(spacer);
+      toolbar.appendChild(refreshButton);
+      toolbar.appendChild(clearButton);
+      root.appendChild(toolbar);
+
+      const list = document.createElement('div');
+      list.className = 'log-list';
+      root.appendChild(list);
+
+      if (!state.logs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'log-entry';
+        empty.innerHTML = '<span class="log-status-icon"></span><span class="log-main"><strong>No activity yet</strong><span>Queued and finished operations will appear here.</span><span class="log-time">/data/BFpilot/logs</span></span>';
+        list.appendChild(empty);
+      }
+
+      for (const log of state.logs) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        const status = activityStatus(log);
+        const resultClass = ['success', 'running', 'queued', 'cancelled', 'abandoned'].includes(status)
+          ? status
+          : 'failed';
+        row.className = 'log-entry ' + resultClass;
+        row.classList.toggle('owned', !!log.owned && (status === 'queued' || status === 'running'));
+        row.classList.toggle('selected', (log.queueId || log.name) === state.selectedLog);
+
+        const icon = document.createElement('span');
+        icon.className = 'log-status-icon';
+        icon.innerHTML = logStatusSvg(resultClass);
+
+        const main = document.createElement('span');
+        main.className = 'log-main';
+        const name = document.createElement('strong');
+        name.textContent = activityKindLabel(log.kind || log.operation) +
+          (log.displayName ? ' - ' + log.displayName : '');
+        const target = document.createElement('span');
+        target.textContent = (log.target || log.destPath) && (log.target || log.destPath) !== '-' ?
+          (log.target || log.destPath) : (log.error || log.logName || log.name || '');
+        const meta = document.createElement('span');
+        meta.className = 'log-time';
+        meta.textContent = activityMeta(log);
+        main.appendChild(name);
+        main.appendChild(target);
+        const warning = activityWarning(log);
+        if (warning) {
+          const note = document.createElement('span');
+          note.className = 'activity-warning';
+          note.textContent = warning;
+          main.appendChild(note);
+        }
+        if (status === 'running' && Number(log.totalBytes || 0) > 0) {
+          const meter = document.createElement('span');
+          meter.className = 'activity-meter';
+          const fill = document.createElement('span');
+          fill.style.width = activityPercent(log).toFixed(1) + '%';
+          meter.appendChild(fill);
+          main.appendChild(meter);
+        }
+        main.appendChild(meta);
+
+        row.appendChild(icon);
+        row.appendChild(main);
+        row.addEventListener('click', () => openLog(log));
+        list.appendChild(row);
+      }
+
+      updatePlaces();
+    }
+
+
+    async function openLog(log) {
+      state.selectedLog = log.queueId || log.name;
+      drawLogs();
+      renderLogModal(log, '', false, true);
+      const name = log && (log.logName || log.name);
+      if (name) {
+        try {
+          const data = await api('/api/fs/logs/read?name=' + encodeURIComponent(name));
+          renderLogModal(log, data.content || '', data.truncated, false);
+        } catch (err) {
+          renderLogModal(log, '', false, false);
+        }
+      } else {
+        renderLogModal(log, '', false, false);
+      }
+    }
+
+
+    async function refreshLogs(options) {
+      const opts = options || {};
+      if (opts.activate !== false) setSideMode('activity');
+      if (!opts.preserveSelection) state.selectedLog = '';
+      if (!opts.quiet) showLogsLoading();
+      try {
+        const data = await api('/api/fs/activity/poll?clientId=' +
+          encodeURIComponent(activityClientId()) + '&owned=' +
+          encodeURIComponent(activityOwnedIds()));
+        state.logs = sortActivityItems(data.items || []);
+        drawLogs();
+        if (data.start) startQueuedActivity(data.start);
+      } catch (err) {
+        if (!opts.quiet) {
+          state.logs = [];
+          drawLogs();
+          toast('activity: ' + err.message, 'err');
+        }
+      }
+    }
+
+
+    async function clearLogs() {
+      if (!confirm('Clear finished Activity records and operation log files from the PS5?')) return;
+      try {
+        const result = await api('/api/fs/activity/clear');
+        state.logs = [];
+        state.selectedLog = '';
+        closeLogModal();
+        drawLogs();
+        toast('Removed ' + Number(result.removed || 0) + ' finished log file(s)', 'ok');
+      } catch (err) {
+        toast('clear activity: ' + err.message, 'err');
+      }
+    }
+
+
+    function canCancelActivity(item) {
+      const status = activityStatus(item);
+      return !!(item && item.source !== 'log' && item.owned &&
+        (status === 'queued' || status === 'running'));
+    }
+
+
+    function canRetryActivity(item) {
+      const status = activityStatus(item);
+      return !!(item && item.source !== 'log' &&
+        (status === 'failed' || status === 'cancelled' || status === 'abandoned') &&
+        state.localQueue.has(item.queueId));
+    }
+
+
+    async function cancelActivity(item) {
+      if (!item || !item.queueId) return;
+      if (item.queueId === state.activeQueueId) {
+        state.uploadAbort = true;
+        Array.from(state.uploadXhrs).forEach((xhr) => xhr.abort());
+      }
+      try {
+        await api('/api/fs/activity/cancel?queueId=' + encodeURIComponent(item.queueId));
+        const local = state.localQueue.get(item.queueId);
+        if (local) local.status = 'cancelled';
+        closeLogModal();
+        scheduleLogsReveal();
+        toast('Activity cancelled', 'err');
+      } catch (err) {
+        toast('activity cancel: ' + err.message, 'err');
+      }
+    }
+
+
+    async function activityProgress(queue, copied, total, done, failed, force) {
+      if (!queue || !queue.queueId || !queue.leaseToken) return;
+      const now = Date.now();
+      if (!force && now - state.activeActivityProgressAt < 700) return;
+      state.activeActivityProgressAt = now;
+      const url = '/api/fs/activity/progress?queueId=' + encodeURIComponent(queue.queueId) +
+        '&leaseToken=' + encodeURIComponent(queue.leaseToken) +
+        '&copied=' + encodeURIComponent(String(Math.max(0, Math.round(copied || 0)))) +
+        '&total=' + encodeURIComponent(String(Math.max(0, Math.round(total || 0)))) +
+        '&done=' + encodeURIComponent(String(Math.max(0, Math.round(done || 0)))) +
+        '&failed=' + encodeURIComponent(String(Math.max(0, Math.round(failed || 0))));
+      api(url).catch(() => {});
+    }
+
+
+    async function activityComplete(queue, status, error, copied, total, done, failed) {
+      if (!queue || !queue.queueId || !queue.leaseToken) return;
+      const url = '/api/fs/activity/complete?queueId=' + encodeURIComponent(queue.queueId) +
+        '&leaseToken=' + encodeURIComponent(queue.leaseToken) +
+        '&status=' + encodeURIComponent(status || 'failed') +
+        '&error=' + encodeURIComponent(error || '') +
+        '&copied=' + encodeURIComponent(String(Math.max(0, Math.round(copied || 0)))) +
+        '&total=' + encodeURIComponent(String(Math.max(0, Math.round(total || 0)))) +
+        '&done=' + encodeURIComponent(String(Math.max(0, Math.round(done || 0)))) +
+        '&failed=' + encodeURIComponent(String(Math.max(0, Math.round(failed || 0))));
+      await api(url).catch(() => {});
+    }
+
+
+    async function enqueueLocalActivity(kind, displayName, destPath, totalBytes, totalItems, payload) {
+      const localId = nextLocalId(kind);
+      const url = '/api/fs/activity/enqueue?clientId=' + encodeURIComponent(activityClientId()) +
+        '&localId=' + encodeURIComponent(localId) +
+        '&kind=' + encodeURIComponent(kind) +
+        '&name=' + encodeURIComponent(displayName || kind) +
+        '&dest=' + encodeURIComponent(destPath || state.path) +
+        '&bytes=' + encodeURIComponent(String(Math.max(0, Math.round(totalBytes || 0)))) +
+        '&items=' + encodeURIComponent(String(Math.max(0, Math.round(totalItems || 0))));
+      const data = await api(url);
+      const queueId = data.queueId;
+      const item = Object.assign({}, payload || {}, {
+        queueId,
+        localId,
+        kind,
+        displayName: displayName || kind,
+        destPath: destPath || state.path,
+        totalBytes: totalBytes || 0,
+        totalItems: totalItems || 0,
+        status: 'queued',
+        leaseToken: '',
+        started: false
+      });
+      state.localQueue.set(queueId, item);
+      setSideMode('activity');
+      drawLogs();
+      startActivityPolling();
+      scheduleLogsReveal();
+      toast('Queued ' + activityKindLabel(kind) + ': ' + item.displayName, 'ok');
+      return item;
+    }
+
+
+    async function enqueueUploadFiles(files) {
+      const list = Array.from(files || []);
+      if (!list.length) return;
+      const totalBytes = list.reduce((sum, file) => sum + (file.size || 0), 0);
+      const displayName = list.length === 1 ? list[0].name : list.length + ' upload items';
+      try {
+        await enqueueLocalActivity('upload', displayName, state.path, totalBytes, list.length, {
+          files: list,
+          basePath: state.path
+        });
+      } catch (err) {
+        toast('activity: ' + err.message, 'err');
+      }
+    }
+
+
+    async function enqueueZipUpload(file) {
+      if (!file) return;
+      setJobBox('queue', 'Inspecting ZIP', 0);
+      try {
+        const plan = await planZipUpload(file);
+        await enqueueLocalActivity('zip', file.name, state.path, file.size || 0, plan.files || 1, {
+          file,
+          plan,
+          basePath: state.path
+        });
+      } catch (err) {
+        toast('zip: ' + err.message, 'err');
+      } finally {
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 800);
+      }
+    }
+
+
+    async function enqueueRarUpload(files) {
+      try {
+        const plan = planRarUpload(files);
+        await enqueueLocalActivity('rar', plan.archiveName, state.path,
+          plan.dataSize || 0, plan.volumes.length || 1, {
+            files: plan.volumes.map((volume) => volume.file),
+            plan,
+            basePath: state.path,
+            password: ''
+          });
+      } catch (err) {
+        toast('rar: ' + err.message, 'err');
+      }
+    }
+
+
+    async function retryActivity(item) {
+      const local = item && state.localQueue.get(item.queueId);
+      if (!local) {
+        toast('Local files are no longer available for retry', 'err');
+        return;
+      }
+      const payload = Object.assign({}, local, {
+        queueId: '',
+        leaseToken: '',
+        started: false,
+        status: 'queued'
+      });
+      if (payload.kind === 'rar') {
+        const password = prompt('RAR password', payload.password || '');
+        if (password === null) return;
+        payload.password = password;
+      }
+      try {
+        await enqueueLocalActivity(payload.kind, payload.displayName, payload.destPath,
+          payload.totalBytes, payload.totalItems, payload);
+        state.localQueue.delete(item.queueId);
+        closeLogModal();
+      } catch (err) {
+        toast('retry: ' + err.message, 'err');
+      }
+    }
+
+
+    function startActivityPolling() {
+      if (state.activityPollTimer) return;
+      state.activityPollTimer = setInterval(() => {
+        refreshLogs({ activate: false, preserveSelection: true, quiet: true });
+      }, ACTIVITY_POLL_MS);
+    }
+
+
+    function finishLocalActivity(item, status) {
+      if (!item) return;
+      item.status = status || item.status;
+      item.started = false;
+      item.leaseToken = '';
+      if (status === 'success') {
+        state.localQueue.delete(item.queueId);
+      }
+    }
+
+
+    function startQueuedActivity(start) {
+      if (!start || !start.queueId || !start.leaseToken) return;
+      const item = state.localQueue.get(start.queueId);
+      if (!item || item.started || state.activeQueueId) return;
+      item.started = true;
+      item.status = 'running';
+      item.leaseToken = start.leaseToken;
+      state.activeQueueId = item.queueId;
+      state.activeLeaseToken = item.leaseToken;
+      state.activeActivityProgressAt = 0;
+      scheduleLogsReveal();
+
+      (async () => {
+        let result = { status: 'failed', error: 'activity failed' };
+        try {
+          if (item.kind === 'upload') {
+            result = await runUploadFiles(item.files || [], item);
+          } else if (item.kind === 'zip') {
+            result = await uploadZip(item.file, item);
+          } else if (item.kind === 'rar') {
+            result = await uploadRar(item.files || [], item);
+          } else {
+            throw new Error('Unsupported activity kind');
+          }
+        } catch (err) {
+          result = {
+            status: state.uploadAbort || isCancelledError(err.message) ? 'cancelled' : 'failed',
+            error: err.message || 'activity failed'
+          };
+          await activityComplete(item, result.status || 'failed',
+            result.error, 0, item.totalBytes || 0, 0, 1);
+          toast('activity: ' + result.error, 'err');
+        } finally {
+          state.activeQueueId = '';
+          state.activeLeaseToken = '';
+          finishLocalActivity(item, result.status);
+          refreshLogs({ activate: true, preserveSelection: true, quiet: true });
+        }
+      })();
+    }
+
+
     function selectedPaths() {
       return Array.from(state.selected).map((name) => joinPath(state.path, name));
     }
 
     function selectedEntries() {
       return state.entries.filter((entry) => state.selected.has(entry.name));
+    }
+
+    function removeEntriesFromView(names) {
+      const remove = new Set(names);
+      state.entries = state.entries.filter((entry) => !remove.has(entry.name));
+      remove.forEach((name) => state.selected.delete(name));
+      drawList();
+    }
+
+    function multiSelectRequested(event) {
+      return !!(state.multiSelectLock || state.controllerMulti ||
+        (event && (event.ctrlKey || event.metaKey || event.shiftKey)));
+    }
+
+    function controllerLikeClick(event, target) {
+      return !!(event && target === document.activeElement &&
+        (event.detail === 0 || (event.clientX === 0 && event.clientY === 0)));
+    }
+
+    function toggleMultiSelectLock() {
+      state.multiSelectLock = !state.multiSelectLock;
+      updateMultiSelectButton();
+    }
+
+    function updateMultiSelectButton() {
+      const button = el('multi-select');
+      if (!button) return;
+      button.classList.toggle('active', state.multiSelectLock);
+      button.setAttribute('aria-pressed', state.multiSelectLock ? 'true' : 'false');
+    }
+
+    function updateListSelectionState() {
+      document.querySelectorAll('#list .file-row[data-name]').forEach((row) => {
+        const selected = state.selected.has(row.dataset.name);
+        row.classList.toggle('selected', selected);
+        const main = row.querySelector('.row-main');
+        if (main) main.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      });
+      updateSelection();
+    }
+
+    function selectEntry(entry, additive) {
+      if (additive) {
+        if (state.selected.has(entry.name)) state.selected.delete(entry.name);
+        else state.selected.add(entry.name);
+      } else {
+        state.selected.clear();
+        state.selected.add(entry.name);
+      }
+      updateListSelectionState();
+    }
+
+    async function extractLocalArchive(entry) {
+      if (!entry || entry.dir) return;
+      const kind = localArchiveKind(entry.name);
+      if (!kind) {
+        window.open(fileUrl(joinPath(state.path, entry.name)), '_blank');
+        return;
+      }
+
+      const initialDest = '/data/homebrew';
+      const chosen = prompt('Extract to', initialDest);
+      if (!chosen) return;
+      const dest = cleanPath(chosen);
+      const archivePath = joinPath(state.path, entry.name);
+      let password = '';
+      let askedPassword = false;
+
+      for (;;) {
+        const verb = kind === 'rar' ? 'unrar' : 'unzip';
+        let url = '/api/fs/extract?path=' + encodeURIComponent(archivePath) +
+          '&dest=' + encodeURIComponent(dest);
+        if (password) url += '&password=' + encodeURIComponent(password);
+
+        try {
+          setSideMode('activity');
+          setJobBox(verb, 'Starting local extraction', 0);
+          setTimeout(() => {
+            if (state.jobTimer) return;
+            pollJob();
+          }, 150);
+          const result = await api(url);
+          await waitJobIdle().catch(() => {});
+          await openPath(dest).catch(() => refresh());
+          toast('Extracted to ' + (result.path || dest), 'ok');
+          scheduleLogsReveal();
+          return;
+        } catch (err) {
+          if (kind === 'rar' && isRarPasswordError(err.message)) {
+            const nextPassword = prompt(askedPassword ?
+              'Wrong RAR password. Try again' :
+              'RAR password may be required');
+            if (nextPassword === null) {
+              toast('RAR password required', 'err');
+              return;
+            }
+            password = nextPassword;
+            askedPassword = true;
+            continue;
+          }
+          toast('extract: ' + err.message, 'err');
+          await refresh().catch(() => {});
+          return;
+        }
+      }
+    }
+
+    function renderRestoreModal(entry, backups, loading, error) {
+      const modal = el('log-modal');
+      const body = el('log-modal-body');
+      const title = el('log-modal-title');
+      const target = joinPath(state.path, entry.name);
+      title.textContent = 'Restore Backup';
+      body.textContent = '';
+
+      const rows = [
+        ['Folder', entry.name],
+        ['Path', target],
+        ['Backups', loading ? 'Loading' : String((backups || []).length)]
+      ];
+      if (error) rows.push(['Error', error]);
+      const grid = document.createElement('div');
+      grid.className = 'detail-grid';
+      rows.forEach((row) => grid.appendChild(detailRow(row[0], row[1])));
+      body.appendChild(grid);
+
+      if (loading) {
+        const pre = document.createElement('pre');
+        pre.className = 'log-content';
+        pre.textContent = 'Loading backups...';
+        body.appendChild(pre);
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      if (error || !backups || !backups.length) {
+        const pre = document.createElement('pre');
+        pre.className = 'log-content';
+        pre.textContent = error || 'No backups were found for this folder.';
+        body.appendChild(pre);
+        modal.classList.remove('hidden');
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'backup-list';
+      backups.forEach((backup) => {
+        const item = document.createElement('div');
+        item.className = 'backup-item';
+        const meta = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = backup.archive || backup.id || 'Archive backup';
+        const detail = document.createElement('span');
+        const changed = Number(backup.old || 0) + Number(backup.added || 0);
+        detail.textContent = formatDate(Number(backup.created || 0)) +
+          ' - ' + changed + ' changed path' + (changed === 1 ? '' : 's') +
+          (backup.complete ? '' : ' - incomplete');
+        meta.appendChild(name);
+        meta.appendChild(detail);
+        const restore = document.createElement('button');
+        restore.type = 'button';
+        restore.className = 'primary';
+        restore.textContent = 'Restore';
+        restore.addEventListener('click', () => restoreBackup(entry, backup));
+        item.appendChild(meta);
+        item.appendChild(restore);
+        list.appendChild(item);
+      });
+      body.appendChild(list);
+      modal.classList.remove('hidden');
+    }
+
+    async function openRestoreBackup(entry) {
+      if (!entry || !entry.dir) return;
+      renderRestoreModal(entry, [], true, '');
+      try {
+        const target = joinPath(state.path, entry.name);
+        const data = await api('/api/fs/backups/list?path=' + encodeURIComponent(target));
+        renderRestoreModal(entry, data.backups || [], false, '');
+      } catch (err) {
+        renderRestoreModal(entry, [], false, err.message);
+      }
+    }
+
+    async function restoreBackup(entry, backup) {
+      if (!entry || !entry.dir || !backup || !backup.id) return;
+      const target = joinPath(state.path, entry.name);
+      try {
+        setJobBox('restore', 'Restoring backup', 0);
+        await api('/api/fs/backups/restore?path=' + encodeURIComponent(target) +
+          '&id=' + encodeURIComponent(backup.id));
+        closeLogModal();
+        toast('Backup restored', 'ok');
+        await refresh();
+      } catch (err) {
+        toast('restore: ' + err.message, 'err');
+        openRestoreBackup(entry).catch(() => {});
+      } finally {
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 900);
+      }
+    }
+
+    function openEntry(entry) {
+      const next = joinPath(state.path, entry.name);
+      if (entry.dir) {
+        openPath(next);
+      } else if (localArchiveKind(entry.name)) {
+        extractLocalArchive(entry);
+      } else {
+        window.open(fileUrl(next), '_blank');
+      }
+    }
+
+    function iconSvg(name) {
+      switch(name) {
+      case 'folder':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 8.5h18"></path></svg>';
+      case 'file':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5"></path></svg>';
+      case 'folder-plus':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>';
+      case 'more':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>';
+      case 'download':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>';
+      case 'rename':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>';
+      case 'delete':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>';
+      case 'upload-file':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5"></path><path d="M12 17V9"></path><path d="m8.5 12.5 3.5-3.5 3.5 3.5"></path></svg>';
+      case 'upload-folder':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 8.5h18"></path><path d="M12 17v-6"></path><path d="m9.5 13.5 2.5-2.5 2.5 2.5"></path></svg>';
+      case 'upload-zip':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5"></path><path d="M9 7h2"></path><path d="M11 9h2"></path><path d="M9 11h2"></path><path d="M11 13h2"></path><path d="M12 19v-4"></path><path d="m9.5 17.5 2.5-2.5 2.5 2.5"></path></svg>';
+      case 'upload-rar':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"></path><path d="M8 5v14"></path><path d="M12 5v14"></path><path d="M16 5v14"></path><path d="M12 17v-5"></path><path d="m9.5 14.5 2.5-2.5 2.5 2.5"></path></svg>';
+      case 'extract':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v5H5z"></path><path d="M7 9v11h10V9"></path><path d="M12 11v6"></path><path d="m9.5 14.5 2.5 2.5 2.5-2.5"></path></svg>';
+      case 'backup':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3 2"></path></svg>';
+      case 'permissions':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V8a4 4 0 0 1 8 0v3"></path><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M9 16h6"></path><path d="M12 13v6"></path></svg>';
+      default:
+        return '';
+      }
+    }
+
+    function decorateIconButtons() {
+      document.querySelectorAll('button[data-icon]').forEach((button) => {
+        if (button.querySelector('svg')) return;
+        const label = button.textContent;
+        button.textContent = '';
+        const icon = document.createElement('span');
+        icon.innerHTML = iconSvg(button.dataset.icon);
+        const text = document.createElement('span');
+        text.textContent = label;
+        button.appendChild(icon);
+        button.appendChild(text);
+      });
+    }
+
+    function closeRowMenus(except) {
+      document.querySelectorAll('.row-menu.open').forEach((menu) => {
+        if (menu === except) return;
+        menu.classList.remove('open');
+        const button = menu.parentElement && menu.parentElement.querySelector('.row-more');
+        if (button) button.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function positionFloatingMenu(menu, anchor) {
+      const gap = 6;
+      const margin = 8;
+      const rect = anchor.getBoundingClientRect();
+      const width = menu.offsetWidth || 150;
+      const height = menu.offsetHeight || 104;
+      let left = rect.right - width;
+      let top = rect.bottom + gap;
+
+      left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+      if (top + height > window.innerHeight - margin) {
+        top = Math.max(margin, rect.top - height - gap);
+      }
+
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+    }
+
+    function insideClass(target, className) {
+      for(let node = target; node && node !== document; node = node.parentNode) {
+        if(node.classList && node.classList.contains(className)) return true;
+      }
+      return false;
+    }
+
+    function makeMenuButton(icon, label, handler, className) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      if (className) button.className = className;
+      button.innerHTML = iconSvg(icon) + '<span></span>';
+      button.querySelector('span').textContent = label;
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closeRowMenus();
+        handler();
+      });
+      return button;
+    }
+
+    function attachRowMenu(row, entry) {
+      const actions = row.querySelector('.row-actions');
+      if (!actions) return;
+
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'row-more';
+      more.setAttribute('aria-label', 'Actions for ' + entry.name);
+      more.setAttribute('aria-haspopup', 'menu');
+      more.setAttribute('aria-expanded', 'false');
+      more.innerHTML = iconSvg('more');
+
+      const menu = document.createElement('div');
+      menu.className = 'row-menu';
+      menu.setAttribute('role', 'menu');
+      if (!entry.dir && localArchiveKind(entry.name)) {
+        menu.appendChild(makeMenuButton('extract', 'Extract', () => extractLocalArchive(entry)));
+      }
+      if (entry.dir && backupCount(entry) > 0) {
+        const backup = document.createElement('button');
+        backup.type = 'button';
+        backup.className = 'backup-indicator';
+        backup.setAttribute('aria-label', 'Restore backups for ' + entry.name);
+        backup.title = backupCount(entry) + ' backup' + (backupCount(entry) === 1 ? '' : 's');
+        backup.innerHTML = iconSvg('backup');
+        backup.addEventListener('click', (event) => {
+          event.stopPropagation();
+          closeRowMenus();
+          openRestoreBackup(entry);
+        });
+        actions.appendChild(backup);
+        menu.appendChild(makeMenuButton('backup', 'Restore Backup', () => openRestoreBackup(entry)));
+      }
+      if (entry.dir) {
+        menu.appendChild(makeMenuButton('permissions', 'Make Executable', () => chmodEntry(entry)));
+      }
+      menu.appendChild(makeMenuButton('download', 'Download', () => downloadEntry(entry)));
+      menu.appendChild(makeMenuButton('rename', 'Rename', () => renameEntry(entry)));
+      menu.appendChild(makeMenuButton('delete', 'Delete', () => deleteEntry(entry), 'danger'));
+
+      menu.addEventListener('keydown', (event) => {
+        const buttons = Array.from(menu.querySelectorAll('button'));
+        const index = buttons.indexOf(document.activeElement);
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeRowMenus();
+          more.focus();
+          return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        buttons[(index + delta + buttons.length) % buttons.length].focus();
+      });
+
+      more.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        closeRowMenus(menu);
+        menu.classList.toggle('open', open);
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && (event.detail === 0 || more === document.activeElement)) {
+          const first = menu.querySelector('button');
+          if (first) setTimeout(() => first.focus(), 0);
+        }
+      });
+
+      actions.appendChild(more);
+      actions.appendChild(menu);
+    }
+
+    function attachBulkMenu() {
+      const actions = el('bulk-actions');
+      if (!actions || actions.children.length) return;
+
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'row-more toolbar-more';
+      more.setAttribute('aria-label', 'Selection actions');
+      more.setAttribute('aria-haspopup', 'menu');
+      more.setAttribute('aria-expanded', 'false');
+      more.innerHTML = iconSvg('more');
+
+      const menu = document.createElement('div');
+      menu.className = 'row-menu toolbar-menu';
+      menu.setAttribute('role', 'menu');
+      menu.appendChild(makeMenuButton('rename', 'Rename', renameOne));
+      menu.appendChild(makeMenuButton('download', 'Download', downloadSelected));
+      menu.appendChild(makeMenuButton('delete', 'Delete', deleteSelected, 'danger'));
+
+      menu.addEventListener('keydown', (event) => {
+        const buttons = Array.from(menu.querySelectorAll('button'));
+        const index = buttons.indexOf(document.activeElement);
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeRowMenus();
+          more.focus();
+          return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        buttons[(index + delta + buttons.length) % buttons.length].focus();
+      });
+
+      more.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        closeRowMenus(menu);
+        menu.classList.toggle('open', open);
+        more.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          positionFloatingMenu(menu, more);
+          if (event.detail === 0 || more === document.activeElement) {
+            const first = menu.querySelector('button');
+            if (first) setTimeout(() => first.focus(), 0);
+          }
+        }
+      });
+
+      actions.appendChild(more);
+      actions.appendChild(menu);
     }
 
     async function loadFolderSize(path, token, entry) {
@@ -906,8 +2757,14 @@
     }
 
     function updatePlaces() {
-      document.querySelectorAll('#places button').forEach((button) => {
-        button.classList.toggle('active', cleanPath(button.dataset.path) === state.path);
+      document.querySelectorAll('#places button[data-path]').forEach((button) => {
+        button.classList.toggle('active',
+          state.sideMode === 'paths' && cleanPath(button.dataset.path) === state.path);
+      });
+      document.querySelectorAll('[data-side-mode]').forEach((button) => {
+        const active = button.dataset.sideMode === state.sideMode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
       });
     }
 
@@ -959,43 +2816,58 @@
     function makeRow(entry, parent) {
       const row = document.createElement('div');
       row.className = 'file-row ' + (entry.dir ? 'dir ' : '') + (parent ? 'parent' : '');
+      if (!parent && backupCount(entry) > 0) row.classList.add('has-backups');
       row.innerHTML =
-        '<span class="tag"></span><span class="name"></span><span class="muted-cell type"></span><span class="muted-cell mtime"></span>';
+        '<button type="button" class="row-main"><span class="icon-cell"></span><span class="name"></span><span class="muted-cell type"></span><span class="muted-cell mtime"></span></button><span class="row-actions"></span>';
 
-      row.querySelector('.tag').textContent = entry.dir ? 'DIR' : 'FILE';
-      row.querySelector('.name').textContent = entry.name;
-      row.querySelector('.type').textContent = parent ? '' : (entry.dir ? 'folder' : shortSize(entry.size || 0));
-      row.querySelector('.mtime').textContent = entry.mtime ? new Date(entry.mtime * 1000).toLocaleDateString() : '';
+      const main = row.querySelector('.row-main');
+      main.setAttribute('aria-label', parent ? 'Parent folder' : entry.name);
+      main.querySelector('.icon-cell').innerHTML = iconSvg(entry.dir ? 'folder' : 'file');
+      main.querySelector('.name').textContent = entry.name;
+      main.querySelector('.type').textContent = parent ? '' : (entry.dir ? 'folder' : shortSize(entry.size || 0));
+      main.querySelector('.mtime').textContent = entry.mtime ? new Date(entry.mtime * 1000).toLocaleDateString() : '';
 
       if (!parent && state.selected.has(entry.name)) {
         row.classList.add('selected');
       }
+      if (!parent) {
+        row.dataset.name = entry.name;
+        main.setAttribute('aria-pressed', state.selected.has(entry.name) ? 'true' : 'false');
+      }
 
-      row.addEventListener('click', (event) => {
+      main.addEventListener('click', (event) => {
         if (parent) {
           openPath(parentPath(state.path));
           return;
         }
-        if (event.ctrlKey || event.metaKey) {
-          if (state.selected.has(entry.name)) state.selected.delete(entry.name);
-          else state.selected.add(entry.name);
-        } else {
-          state.selected.clear();
-          state.selected.add(entry.name);
-        }
-        drawList();
+        selectEntry(entry, multiSelectRequested(event) || controllerLikeClick(event, main));
       });
 
-      row.addEventListener('dblclick', () => {
-        if (parent) return;
-        const next = joinPath(state.path, entry.name);
-        if (entry.dir) {
-          openPath(next);
-        } else {
-          window.open(fileUrl(next), '_blank');
+      main.addEventListener('dblclick', () => {
+        if (parent) {
+          return;
         }
+        openEntry(entry);
       });
 
+      if (!parent) {
+        attachRowMenu(row, entry);
+      }
+
+      return row;
+    }
+
+    function makeNewFolderRow() {
+      const row = document.createElement('div');
+      row.className = 'file-row dir new-folder-inline';
+      row.innerHTML =
+        '<button type="button" class="row-main"><span class="icon-cell"></span><span class="name"></span><span class="muted-cell type"></span><span class="muted-cell mtime"></span></button><span class="row-actions"></span>';
+      const main = row.querySelector('.row-main');
+      main.setAttribute('aria-label', 'New Folder');
+      main.querySelector('.icon-cell').innerHTML = iconSvg('folder-plus');
+      main.querySelector('.name').textContent = 'New Folder';
+      main.querySelector('.type').textContent = 'create folder';
+      main.addEventListener('click', () => makeFolder());
       return row;
     }
 
@@ -1005,12 +2877,13 @@
 
       const head = document.createElement('div');
       head.className = 'file-head';
-      head.innerHTML = '<span>Kind</span><span>Name</span><span>Type</span><span>Modified</span>';
+      head.innerHTML = '<span></span><span>Name</span><span>Type</span><span>Modified</span><span></span>';
       list.appendChild(head);
 
       if (state.path !== '/') {
         list.appendChild(makeRow({ name: '..', dir: true }, true));
       }
+      list.appendChild(makeNewFolderRow());
 
       for (const entry of state.entries) {
         list.appendChild(makeRow(entry, false));
@@ -1025,10 +2898,10 @@
       list.textContent = '';
       const head = document.createElement('div');
       head.className = 'file-head';
-      head.innerHTML = '<span>Kind</span><span>Name</span><span>Type</span><span>Modified</span>';
+      head.innerHTML = '<span></span><span>Name</span><span>Type</span><span>Modified</span><span></span>';
       const row = document.createElement('div');
       row.className = 'file-row';
-      row.innerHTML = '<span class="tag">...</span><span class="name">Loading</span><span></span><span></span>';
+      row.innerHTML = '<button type="button" class="row-main" disabled><span class="icon-cell"></span><span class="name">Loading</span><span></span><span></span></button><span></span>';
       list.appendChild(head);
       list.appendChild(row);
     }
@@ -1042,6 +2915,7 @@
         const data = await api('/api/fs/list?path=' + encodeURIComponent(state.path));
         state.entries = sortEntries(data.entries || []);
         state.selected.clear();
+        saveLastPath(state.path);
         drawList();
       } catch (err) {
         state.entries = [];
@@ -1064,21 +2938,26 @@
         return;
       }
 
+      let started = 0;
+      const startedNames = [];
       for (const source of paths) {
         try {
           await api('/api/fs/' + verb +
             '?src=' + encodeURIComponent(source) +
             '&dst=' + encodeURIComponent(target));
-          pollJob();
-          const done = await waitJobIdle();
-          if (done.error) throw new Error(done.error);
+          started++;
+          startedNames.push(source.slice(source.lastIndexOf('/') + 1));
         } catch (err) {
           toast(verb + ': ' + err.message, 'err');
-          break;
         }
       }
 
-      await refresh();
+      if (started > 0) {
+        if (verb === 'move') removeEntriesFromView(startedNames);
+        toast((verb === 'move' ? 'Move' : 'Copy') + ' started for ' +
+          started + ' item(s)', 'ok');
+        scheduleLogsReveal();
+      }
     }
 
     async function waitJobIdle() {
@@ -1096,6 +2975,31 @@
       }
     }
 
+    async function jobErrorAfterUploadFailure(timeoutMs) {
+      const end = Date.now() + timeoutMs;
+      let sawJob = false;
+      while (Date.now() < end) {
+        try {
+          const job = await api('/api/fs/job/status');
+          sawJob = true;
+          if (!job.busy) return job.error || '';
+        } catch (err) {
+          if (!sawJob) return '';
+        }
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      return '';
+    }
+
+    function warnIfUploadBackgrounded() {
+      if (!document.hidden || !state.uploadBusy) return;
+      const now = Date.now();
+      if (now - state.lastBackgroundWarningAt < 5000) return;
+      state.lastBackgroundWarningAt = now;
+      setSideMode('activity');
+      toast('Keep this upload tab open and foreground; backgrounding can interrupt the stream.', 'err');
+    }
+
     async function makeFolder() {
       const name = prompt('Folder name');
       if (!name) return;
@@ -1108,17 +3012,12 @@
       }
     }
 
-    async function renameOne() {
-      const entries = selectedEntries();
-      if (entries.length !== 1) {
-        toast('Select one item', 'err');
-        return;
-      }
-      const next = prompt('New name', entries[0].name);
-      if (!next || next === entries[0].name) return;
+    async function renameEntry(entry) {
+      const next = prompt('New name', entry.name);
+      if (!next || next === entry.name) return;
       try {
         await api('/api/fs/rename?src=' +
-          encodeURIComponent(joinPath(state.path, entries[0].name)) +
+          encodeURIComponent(joinPath(state.path, entry.name)) +
           '&dst=' + encodeURIComponent(joinPath(state.path, next)));
         await refresh();
         toast('Renamed', 'ok');
@@ -1127,13 +3026,70 @@
       }
     }
 
+    async function renameOne() {
+      const entries = selectedEntries();
+      if (entries.length !== 1) {
+        toast('Select one item', 'err');
+        return;
+      }
+      await renameEntry(entries[0]);
+    }
+
+    function downloadEntry(entry) {
+      if (entry.dir) {
+        toast('Download supports files only', 'err');
+        return;
+      }
+      window.open(fileUrl(joinPath(state.path, entry.name)), '_blank');
+    }
+
     function downloadSelected() {
       const entries = selectedEntries();
       if (entries.length !== 1 || entries[0].dir) {
         toast('Select one file', 'err');
         return;
       }
-      window.open(fileUrl(joinPath(state.path, entries[0].name)), '_blank');
+      downloadEntry(entries[0]);
+    }
+
+    async function chmodEntry(entry) {
+      if (!entry || !entry.dir) {
+        toast('Select one folder', 'err');
+        return;
+      }
+      if (!confirm('Set 777 recursively for ' + entry.name + '?')) return;
+      const path = joinPath(state.path, entry.name);
+      try {
+        await api('/api/fs/chmod777?path=' + encodeURIComponent(path));
+        toast('Permission update started', 'ok');
+        scheduleLogsReveal();
+      } catch (err) {
+        toast('permissions: ' + err.message, 'err');
+        scheduleLogsReveal();
+      }
+    }
+
+    function runBackgroundDeletes(paths) {
+      (async () => {
+        for (const path of paths) {
+          try {
+            await api('/api/fs/delete?recursive=1&path=' + encodeURIComponent(path));
+          } catch (err) {
+            toast('delete: ' + err.message, 'err');
+            await refresh().catch(() => {});
+            return;
+          }
+        }
+        scheduleLogsReveal();
+      })();
+    }
+
+    async function deleteEntry(entry) {
+      if (!confirm('Delete ' + entry.name + '?')) return;
+      const path = joinPath(state.path, entry.name);
+      removeEntriesFromView([entry.name]);
+      toast('Delete started', 'ok');
+      runBackgroundDeletes([path]);
     }
 
     async function deleteSelected() {
@@ -1144,35 +3100,24 @@
       }
       if (!confirm('Delete ' + paths.length + ' item(s)?')) return;
 
-      for (const path of paths) {
-        try {
-          await api('/api/fs/delete?recursive=1&path=' + encodeURIComponent(path));
-          pollJob();
-          const done = await waitJobIdle();
-          if (done.error) throw new Error(done.error);
-        } catch (err) {
-          toast('delete: ' + err.message, 'err');
-          break;
-        }
-      }
-      await refresh();
+      const names = Array.from(state.selected);
+      removeEntriesFromView(names);
+      toast('Delete started for ' + paths.length + ' item(s)', 'ok');
+      runBackgroundDeletes(paths);
     }
 
-    function uploadOne(file, relPath, onProgress) {
+    function sendUploadRequest(url, body, onProgress, size) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        let url = '/api/fs/upload?path=' + encodeURIComponent(state.path) +
-          '&filename=' + encodeURIComponent(file.name);
-        if (relPath) url += '&relpath=' + encodeURIComponent(relPath);
 
         function clearXhr() {
-          if (state.uploadXhr === xhr) state.uploadXhr = null;
+          state.uploadXhrs.delete(xhr);
         }
 
-        state.uploadXhr = xhr;
+        state.uploadXhrs.add(xhr);
         xhr.open('POST', url);
         xhr.upload.onprogress = (event) => {
-          const loaded = Math.min(file.size, Number(event.loaded || 0));
+          const loaded = Math.min(size, Number(event.loaded || 0));
           if (onProgress) onProgress(loaded);
         };
         xhr.onload = () => {
@@ -1187,60 +3132,777 @@
         };
         xhr.onerror = () => {
           clearXhr();
-          reject(new Error('network error'));
+          reject(new Error('browser upload interrupted'));
         };
         xhr.onabort = () => {
           clearXhr();
           reject(new Error('upload cancelled'));
         };
-        xhr.send(file);
+        try {
+          xhr.send(body);
+        } catch (err) {
+          clearXhr();
+          reject(err);
+        }
       });
     }
 
-    async function uploadFiles(files) {
-      if (!files || !files.length || state.uploadBusy) return;
-      state.uploadBusy = true;
-      state.uploadAbort = false;
-      state.uploadXhr = null;
-      let ok = 0;
-      let failed = 0;
-      let uploadedBytes = 0;
-      const totalBytes = files.reduce((sum, file) => sum + (file.size || 0), 0);
-      const startedAt = Date.now();
+    function uploadUrl(endpoint, file, basePath, relPath, extra, queue) {
+      let url = endpoint + '?path=' + encodeURIComponent(basePath) +
+        '&filename=' + encodeURIComponent(file.name);
+      if (relPath) url += '&relpath=' + encodeURIComponent(relPath);
+      if (extra) url += extra;
+      url += activityLeaseExtra(queue);
+      return url;
+    }
 
-      updateUploadJob(0, totalBytes, startedAt, 0, files.length, 'Preparing', failed, false);
+    function uploadTargetPath(file, basePath, relPath) {
+      let path = basePath;
+      if (relPath) {
+        relPath.split('/').forEach((segment) => {
+          if (segment) path = joinPath(path, segment);
+        });
+      }
+      return joinPath(path, file.name);
+    }
 
-      for (let index = 0; index < files.length; index++) {
-        const file = files[index];
-        if (state.uploadAbort) break;
-        const relPath = file.webkitRelativePath ?
-          file.webkitRelativePath.split('/').slice(0, -1).join('/') : '';
-        try {
-          await uploadOne(file, relPath, (loaded) => {
-            updateUploadJob(uploadedBytes + loaded, totalBytes, startedAt,
-              index, files.length, file.name, failed, state.uploadAbort);
-          });
-          ok++;
-          uploadedBytes += file.size || 0;
-          updateUploadJob(uploadedBytes, totalBytes, startedAt,
-            index, files.length, file.name, failed, false);
-          toast('Uploaded ' + ok + ' / ' + files.length, 'ok');
-        } catch (err) {
-          if (state.uploadAbort || err.message === 'upload cancelled') {
-            state.uploadAbort = true;
-            updateUploadJob(uploadedBytes, totalBytes, startedAt,
-              index, files.length, file.name, failed, true);
-            break;
+    async function uploadChunked(file, basePath, relPath, onProgress, queue) {
+      const chunks = [];
+      for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_SIZE) {
+        const size = Math.min(UPLOAD_CHUNK_SIZE, file.size - offset);
+        chunks.push({ offset, size, loaded: 0 });
+      }
+
+      let nextChunk = 0;
+      let failed = false;
+
+      function reportProgress() {
+        const loaded = chunks.reduce((sum, chunk) => sum + chunk.loaded, 0);
+        if (onProgress) onProgress(Math.min(file.size, loaded));
+      }
+
+      async function chunkWorker() {
+        while(!state.uploadAbort && !failed) {
+          const chunk = chunks[nextChunk++];
+          if (!chunk) break;
+          const body = file.slice(chunk.offset, chunk.offset + chunk.size);
+          const extra = '&offset=' + encodeURIComponent(String(chunk.offset)) +
+            '&total=' + encodeURIComponent(String(file.size));
+          const url = uploadUrl('/api/fs/upload-chunk', file, basePath, relPath, extra, queue);
+          try {
+            await sendUploadRequest(url, body, (loaded) => {
+              chunk.loaded = Math.min(chunk.size, loaded);
+              reportProgress();
+            }, chunk.size);
+            chunk.loaded = chunk.size;
+            reportProgress();
+          } catch (err) {
+            failed = true;
+            if (!state.uploadAbort) {
+              Array.from(state.uploadXhrs).forEach((xhr) => xhr.abort());
+            }
+            throw err;
           }
-          failed++;
-          updateUploadJob(uploadedBytes, totalBytes, startedAt,
-            index, files.length, file.name, failed, false);
-          toast('upload: ' + err.message, 'err');
         }
       }
 
+      const workers = Array.from({
+        length: Math.min(UPLOAD_CHUNK_CONCURRENCY, chunks.length)
+      }, () => chunkWorker());
+      const results = await Promise.allSettled(workers);
+      const failedResult = results.find((result) => result.status === 'rejected');
+      if (failedResult) {
+        const target = uploadTargetPath(file, basePath, relPath);
+        if (!queue) {
+          await api('/api/fs/delete?recursive=0&path=' + encodeURIComponent(target)).catch(() => {});
+        }
+        throw failedResult.reason;
+      }
+      if (state.uploadAbort) throw new Error('upload cancelled');
+      await api(uploadUrl('/api/fs/upload-complete', file, basePath, relPath,
+        '&total=' + encodeURIComponent(String(file.size)), queue));
+    }
+
+    function uploadOne(file, basePath, relPath, onProgress, useChunks, queue) {
+      if (useChunks && file.size >= UPLOAD_CHUNK_THRESHOLD) {
+        return uploadChunked(file, basePath, relPath, onProgress, queue);
+      }
+
+      const url = uploadUrl('/api/fs/upload', file, basePath, relPath, '', queue);
+      return sendUploadRequest(url, file, onProgress, file.size);
+    }
+
+    function readBlobSlice(file, start, end) {
+      const blob = file.slice(start, end);
+      if (blob.arrayBuffer) return blob.arrayBuffer();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('read failed'));
+        reader.readAsArrayBuffer(blob);
+      });
+    }
+
+    function getUint64(view, offset) {
+      const lo = view.getUint32(offset, true);
+      const hi = view.getUint32(offset + 4, true);
+      const value = hi * 4294967296 + lo;
+      if (!Number.isSafeInteger(value)) throw new Error('Zip is too large for this browser');
+      return value;
+    }
+
+    function decodeZipName(bytes, utf8) {
+      if (utf8 && window.TextDecoder) {
+        try {
+          return new TextDecoder('utf-8').decode(bytes);
+        } catch (err) {}
+      }
+      let out = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        out += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+      }
+      return out;
+    }
+
+    function normalizeArchivePath(name) {
+      if (!name || name[0] === '/' || name[0] === '\\') {
+        throw new Error('Zip contains an unsafe path');
+      }
+      const parts = [];
+      const rawParts = name.replace(/\\/g, '/').split('/');
+      for (const part of rawParts) {
+        if (!part) continue;
+        if (part === '.' || part === '..' || part.indexOf('\0') !== -1 ||
+            part.indexOf(':') !== -1 || /[\x00-\x1f]/.test(part)) {
+          throw new Error('Zip contains an unsafe path');
+        }
+        parts.push(part);
+      }
+      if (!parts.length) throw new Error('Zip contains an unsafe path');
+      return parts.join('/');
+    }
+
+    function archiveHasPrefix(path, prefix) {
+      return !prefix || path === prefix || path.startsWith(prefix + '/');
+    }
+
+    function archiveAfterPrefix(path, prefix) {
+      if (!prefix) return path;
+      if (path === prefix) return '';
+      return path.slice(prefix.length + 1);
+    }
+
+    function appFolderFromSegment(segment) {
+      const match = /^PPSA([0-9A-Z]{5})-app$/i.exec(segment || '');
+      return match ? 'PPSA' + match[1].toUpperCase() + '-app' : '';
+    }
+
+    function findZipEocd(bytes) {
+      for (let i = bytes.length - 22; i >= 0; i--) {
+        if (bytes[i] !== 0x50 || bytes[i + 1] !== 0x4b ||
+            bytes[i + 2] !== 0x05 || bytes[i + 3] !== 0x06) {
+          continue;
+        }
+        const commentLen = bytes[i + 20] | (bytes[i + 21] << 8);
+        if (i + 22 + commentLen === bytes.length) return i;
+      }
+      return -1;
+    }
+
+    async function readZipDirectory(file) {
+      if (!file || file.size < 22) throw new Error('Not a zip file');
+      const tailStart = Math.max(0, file.size - ZIP_EOCD_MAX);
+      const tailBytes = new Uint8Array(await readBlobSlice(file, tailStart, file.size));
+      const tailView = new DataView(tailBytes.buffer, tailBytes.byteOffset, tailBytes.byteLength);
+      const eocd = findZipEocd(tailBytes);
+      if (eocd < 0) throw new Error('Could not find zip directory');
+
+      const diskNo = tailView.getUint16(eocd + 4, true);
+      const cdDisk = tailView.getUint16(eocd + 6, true);
+      let entriesThisDisk = tailView.getUint16(eocd + 8, true);
+      let totalEntries = tailView.getUint16(eocd + 10, true);
+      let cdSize = tailView.getUint32(eocd + 12, true);
+      let cdOffset = tailView.getUint32(eocd + 16, true);
+
+      if (diskNo !== 0 || cdDisk !== 0 || entriesThisDisk !== totalEntries) {
+        throw new Error('Multi-disk zip archives are not supported');
+      }
+
+      if (totalEntries === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
+        const locator = eocd - 20;
+        if (locator < 0 || tailView.getUint32(locator, true) !== 0x07064b50) {
+          throw new Error('Bad Zip64 directory');
+        }
+        const zip64Disk = tailView.getUint32(locator + 4, true);
+        const zip64Offset = getUint64(tailView, locator + 8);
+        const diskCount = tailView.getUint32(locator + 16, true);
+        if (zip64Disk !== 0 || diskCount !== 1) {
+          throw new Error('Multi-disk zip archives are not supported');
+        }
+
+        const zip64Fixed = new Uint8Array(await readBlobSlice(file, zip64Offset, zip64Offset + 56));
+        const zip64View = new DataView(zip64Fixed.buffer, zip64Fixed.byteOffset, zip64Fixed.byteLength);
+        if (zip64View.getUint32(0, true) !== 0x06064b50) {
+          throw new Error('Bad Zip64 directory');
+        }
+        if (zip64View.getUint32(16, true) !== 0 || zip64View.getUint32(20, true) !== 0) {
+          throw new Error('Multi-disk zip archives are not supported');
+        }
+        entriesThisDisk = getUint64(zip64View, 24);
+        totalEntries = getUint64(zip64View, 32);
+        cdSize = getUint64(zip64View, 40);
+        cdOffset = getUint64(zip64View, 48);
+        if (entriesThisDisk !== totalEntries) {
+          throw new Error('Multi-disk zip archives are not supported');
+        }
+      }
+
+      if (cdSize <= 0 || cdSize > ZIP_CENTRAL_DIR_MAX ||
+          cdOffset < 0 || cdOffset + cdSize > file.size) {
+        throw new Error('Zip directory is too large or invalid');
+      }
+
+      const cdBytes = new Uint8Array(await readBlobSlice(file, cdOffset, cdOffset + cdSize));
+      const cdView = new DataView(cdBytes.buffer, cdBytes.byteOffset, cdBytes.byteLength);
+      const entries = [];
+      let pos = 0;
+      for (let index = 0; index < totalEntries; index++) {
+        if (pos + 46 > cdBytes.length || cdView.getUint32(pos, true) !== 0x02014b50) {
+          throw new Error('Bad zip directory');
+        }
+        const flags = cdView.getUint16(pos + 8, true);
+        const method = cdView.getUint16(pos + 10, true);
+        const nameLen = cdView.getUint16(pos + 28, true);
+        const extraLen = cdView.getUint16(pos + 30, true);
+        const commentLen = cdView.getUint16(pos + 32, true);
+        const diskStart = cdView.getUint16(pos + 34, true);
+        const nameStart = pos + 46;
+        const nameEnd = nameStart + nameLen;
+        const next = nameEnd + extraLen + commentLen;
+        if (nameEnd > cdBytes.length || next > cdBytes.length) {
+          throw new Error('Bad zip directory');
+        }
+        if (diskStart !== 0) throw new Error('Multi-disk zip archives are not supported');
+        const rawName = decodeZipName(cdBytes.subarray(nameStart, nameEnd),
+          (flags & ZIP_FLAG_UTF8) !== 0);
+        entries.push({
+          path: normalizeArchivePath(rawName),
+          rawName,
+          isDir: /[\/\\]$/.test(rawName),
+          flags,
+          method
+        });
+        pos = next;
+      }
+      return entries;
+    }
+
+    function selectedZipEntries(entries, plan) {
+      return entries.filter((entry) => {
+        if (entry.isDir) return false;
+        if (plan.extractPrefix && !archiveHasPrefix(entry.path, plan.extractPrefix)) return false;
+        if (plan.stripPrefix && !archiveHasPrefix(entry.path, plan.stripPrefix)) return false;
+        const rel = archiveAfterPrefix(entry.path, plan.stripPrefix || plan.extractPrefix || '');
+        return !!rel;
+      });
+    }
+
+    function chooseZipLayout(file, entries) {
+      const appCandidates = [];
+      for (const entry of entries) {
+        const parts = entry.path.split('/');
+        for (let i = 0; i < parts.length; i++) {
+          const destFolder = appFolderFromSegment(parts[i]);
+          if (!destFolder) continue;
+          const prefix = parts.slice(0, i + 1).join('/');
+          if (!appCandidates.some((candidate) => candidate.extractPrefix === prefix)) {
+            appCandidates.push({
+              destFolder,
+              extractPrefix: prefix,
+              stripPrefix: prefix
+            });
+          }
+        }
+      }
+      if (appCandidates.length) {
+        appCandidates.sort((a, b) => {
+          const aEboot = entries.some((entry) => entry.path.toLowerCase() ===
+            (a.extractPrefix + '/eboot.bin').toLowerCase());
+          const bEboot = entries.some((entry) => entry.path.toLowerCase() ===
+            (b.extractPrefix + '/eboot.bin').toLowerCase());
+          if (aEboot !== bEboot) return aEboot ? -1 : 1;
+          if (a.extractPrefix.length !== b.extractPrefix.length) {
+            return a.extractPrefix.length - b.extractPrefix.length;
+          }
+          return a.extractPrefix.localeCompare(b.extractPrefix);
+        });
+        return appCandidates[0];
+      }
+
+      const title = /PPSA[0-9A-Z]{5}/i.exec(file.name || '');
+      if (!title) {
+        throw new Error('No PPSA title ID found in zip name or app folder');
+      }
+      const destFolder = title[0].toUpperCase() + '-app';
+      const eboots = entries.filter((entry) => {
+        const parts = entry.path.split('/');
+        return !entry.isDir && parts[parts.length - 1].toLowerCase() === 'eboot.bin';
+      }).sort((a, b) => {
+        const aParent = parentArchivePath(a.path);
+        const bParent = parentArchivePath(b.path);
+        const aDepth = aParent ? aParent.split('/').length : 0;
+        const bDepth = bParent ? bParent.split('/').length : 0;
+        if (aDepth !== bDepth) return aDepth - bDepth;
+        return a.path.localeCompare(b.path);
+      });
+      if (!eboots.length) {
+        throw new Error('No eboot.bin found to place inside ' + destFolder);
+      }
+      const parent = parentArchivePath(eboots[0].path);
+      return {
+        destFolder,
+        stripPrefix: parent,
+        extractPrefix: parent
+      };
+    }
+
+    function parentArchivePath(path) {
+      const index = path.lastIndexOf('/');
+      return index < 0 ? '' : path.slice(0, index);
+    }
+
+    async function planZipUpload(file) {
+      const entries = await readZipDirectory(file);
+      const plan = chooseZipLayout(file, entries);
+      const selected = selectedZipEntries(entries, plan);
+      if (!selected.length) throw new Error('Zip contained no matching files');
+      for (const entry of selected) {
+        if (entry.flags & ZIP_FLAG_ENCRYPTED) {
+          throw new Error('Encrypted zip entries are not supported');
+        }
+        if (entry.method !== ZIP_METHOD_STORE && entry.method !== ZIP_METHOD_DEFLATE) {
+          throw new Error('Unsupported zip compression method');
+        }
+        if (entry.method === ZIP_METHOD_STORE && (entry.flags & ZIP_FLAG_DATA_DESCRIPTOR)) {
+          throw new Error('Stored zip entries with streaming descriptors are not supported');
+        }
+      }
+      plan.files = selected.length;
+      return plan;
+    }
+
+    function zipUploadUrl(file, basePath, plan, queue) {
+      let url = '/api/fs/upload-zip?path=' + encodeURIComponent(basePath) +
+        '&filename=' + encodeURIComponent(file.name) +
+        '&files=' + encodeURIComponent(String(plan.files || 0));
+      if (plan.destFolder) url += '&destFolder=' + encodeURIComponent(plan.destFolder);
+      if (plan.stripPrefix) url += '&stripPrefix=' + encodeURIComponent(plan.stripPrefix);
+      if (plan.extractPrefix) url += '&extractPrefix=' + encodeURIComponent(plan.extractPrefix);
+      url += activityLeaseExtra(queue);
+      return url;
+    }
+
+    async function uploadZip(file, queue) {
+      if (!file || state.uploadBusy) return;
+      state.uploadBusy = true;
+      state.uploadAbort = false;
+      state.uploadJobCancel = false;
+      state.uploadJobVerb = '';
+      state.uploadXhrs.clear();
+      setJobBox('unzip', 'Inspecting zip', 0);
+      let finalStatus = 'success';
+      let finalError = '';
+
+      try {
+        const plan = queue && queue.plan ? queue.plan : await planZipUpload(file);
+        if (state.uploadAbort) throw new Error('upload cancelled');
+
+        state.uploadJobCancel = true;
+        state.uploadJobVerb = 'unzip';
+        setJobBox('unzip', 'Starting upload', 0);
+        await activityProgress(queue, 0, file.size || 0, 0, 0, true);
+        const url = zipUploadUrl(file, (queue && queue.basePath) || state.path, plan, queue);
+        const upload = sendUploadRequest(url, file, null, file.size);
+        setTimeout(() => {
+          if (state.uploadBusy && state.uploadJobCancel) pollJob();
+        }, 150);
+
+        const result = await upload;
+        const done = await waitJobIdle();
+        if (done.error) throw new Error(done.error);
+        await refresh();
+        toast('Extracted ' + Number(result.files || plan.files || 0) + ' file(s)', 'ok');
+      } catch (err) {
+        finalStatus = state.uploadAbort || isCancelledError(err.message) ? 'cancelled' : 'failed';
+        finalError = finalStatus === 'cancelled' ? 'upload cancelled' : err.message;
+        if (queue) {
+          await activityComplete(queue, finalStatus,
+            finalError, 0, file.size || 0, 0, 1);
+        }
+        if (state.uploadAbort || isCancelledError(err.message)) {
+          toast('Zip upload cancelled', 'err');
+        } else {
+          toast('zip: ' + err.message, 'err');
+        }
+        await refresh().catch(() => {});
+      } finally {
+        state.uploadBusy = false;
+        state.uploadJobCancel = false;
+        state.uploadJobVerb = '';
+        state.uploadXhrs.clear();
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 1600);
+      }
+      return { status: finalStatus, error: finalError };
+    }
+
+    function classifyRarVolume(file) {
+      const name = file && file.name ? file.name : '';
+      const lower = name.toLowerCase();
+      const part = /^(.*)\.part(\d+)\.rar$/i.exec(name);
+      if (part) {
+        const number = Number(part[2]);
+        if (!Number.isInteger(number) || number < 1) {
+          throw new Error('Bad RAR volume name: ' + name);
+        }
+        return {
+          file,
+          name,
+          mode: 'part',
+          base: part[1].toLowerCase(),
+          index: number - 1
+        };
+      }
+      const oldNext = /^(.*)\.r(\d{2})$/i.exec(name);
+      if (oldNext) {
+        return {
+          file,
+          name,
+          mode: 'old',
+          base: oldNext[1].toLowerCase(),
+          index: Number(oldNext[2]) + 1
+        };
+      }
+      if (lower.endsWith('.rar')) {
+        return {
+          file,
+          name,
+          mode: 'old',
+          base: lower.slice(0, -4),
+          index: 0
+        };
+      }
+      throw new Error('Select RAR volumes only');
+    }
+
+    function planRarUpload(files) {
+      const volumes = Array.from(files || []).map(classifyRarVolume);
+      if (!volumes.length) throw new Error('No RAR selected');
+      if (volumes.length > RAR_VOLUME_MAX) throw new Error('Too many RAR volumes selected');
+
+      volumes.sort((a, b) => a.index - b.index || a.name.localeCompare(b.name));
+      const first = volumes[0];
+      if (first.index !== 0 || (first.mode === 'part' && !/\.part0*1\.rar$/i.test(first.name)) ||
+          (first.mode === 'old' && !/\.rar$/i.test(first.name))) {
+        throw new Error('Select the first RAR volume');
+      }
+
+      const seen = new Set();
+      for (let i = 0; i < volumes.length; i++) {
+        const volume = volumes[i];
+        if (volume.mode !== first.mode || volume.base !== first.base) {
+          throw new Error('Selected RAR volumes do not belong to one set');
+        }
+        if (volume.index !== i || seen.has(volume.index)) {
+          throw new Error('Missing or duplicate RAR volume part ' + (i + 1));
+        }
+        if (!Number.isSafeInteger(volume.file.size) || volume.file.size <= 0) {
+          throw new Error('Bad RAR volume size: ' + volume.name);
+        }
+        seen.add(volume.index);
+      }
+
+      return {
+        archiveName: first.name,
+        volumes,
+        dataSize: volumes.reduce((sum, volume) => sum + volume.file.size, 0)
+      };
+    }
+
+    function setUint64(view, offset, value) {
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error('RAR upload is too large for this browser');
+      }
+      const lo = value % 4294967296;
+      const hi = Math.floor(value / 4294967296);
+      view.setUint32(offset, lo, true);
+      view.setUint32(offset + 4, hi, true);
+    }
+
+    function utf8Bytes(text) {
+      if (!window.TextEncoder) throw new Error('This browser cannot encode RAR metadata');
+      return new TextEncoder().encode(text || '');
+    }
+
+    function buildRarUploadBody(plan, password) {
+      const archiveBytes = utf8Bytes(plan.archiveName);
+      const passwordBytes = utf8Bytes(password || '');
+      if (archiveBytes.length <= 0 || archiveBytes.length > 255) {
+        throw new Error('RAR filename is too long');
+      }
+      if (passwordBytes.length > 511) {
+        throw new Error('RAR password is too long');
+      }
+
+      const fixed = new Uint8Array(24);
+      for (let i = 0; i < RAR_UPLOAD_MAGIC.length; i++) {
+        fixed[i] = RAR_UPLOAD_MAGIC.charCodeAt(i);
+      }
+      const fixedView = new DataView(fixed.buffer);
+      fixedView.setUint16(8, plan.volumes.length, true);
+      fixedView.setUint16(10, archiveBytes.length, true);
+      fixedView.setUint16(12, passwordBytes.length, true);
+      fixedView.setUint16(14, 0, true);
+      setUint64(fixedView, 16, plan.dataSize);
+
+      const parts = [fixed, archiveBytes, passwordBytes];
+      for (const volume of plan.volumes) {
+        const nameBytes = utf8Bytes(volume.name);
+        if (nameBytes.length <= 0 || nameBytes.length > 255) {
+          throw new Error('RAR volume name is too long');
+        }
+        const record = new Uint8Array(10);
+        const recordView = new DataView(record.buffer);
+        recordView.setUint16(0, nameBytes.length, true);
+        setUint64(recordView, 2, volume.file.size);
+        parts.push(record, nameBytes);
+      }
+      for (const volume of plan.volumes) {
+        parts.push(volume.file);
+      }
+      return new Blob(parts, { type: 'application/octet-stream' });
+    }
+
+    function rarUploadUrl(file, basePath, queue) {
+      return '/api/fs/upload-rar?path=' + encodeURIComponent(basePath) +
+        '&filename=' + encodeURIComponent(file.name) +
+        activityLeaseExtra(queue);
+    }
+
+    function isRarPasswordError(message) {
+      return /bad rar password|bad password|password required|missing password/i
+        .test(message || '');
+    }
+
+    async function uploadRarAttempt(plan, password, queue) {
+      const body = buildRarUploadBody(plan, password || '');
+      if (state.uploadAbort) throw new Error('upload cancelled');
+
+      state.uploadJobCancel = true;
+      state.uploadJobVerb = 'unrar';
+      setJobBox('unrar', password ? 'Retrying with password' : 'Starting upload', 0);
+      await activityProgress(queue, 0, body.size || plan.dataSize || 0, 0, 0, true);
+      const upload = sendUploadRequest(rarUploadUrl(plan.volumes[0].file,
+          (queue && queue.basePath) || state.path, queue),
+        body, null, body.size);
+      setTimeout(() => {
+        if (state.uploadBusy && state.uploadJobCancel) pollJob();
+      }, 150);
+
+      try {
+        const result = await upload;
+        const done = await waitJobIdle();
+        if (done.error) throw new Error(done.error);
+        return result;
+      } catch (err) {
+        const jobError = await jobErrorAfterUploadFailure(5000);
+        if (jobError) throw new Error(jobError);
+        throw err;
+      }
+    }
+
+    async function uploadRar(files, queue) {
+      if (!files || !files.length || state.uploadBusy) return;
+      state.uploadBusy = true;
+      state.uploadAbort = false;
+      state.uploadJobCancel = false;
+      state.uploadJobVerb = 'unrar';
+      state.uploadXhrs.clear();
+      setJobBox('unrar', 'Preparing RAR', 0);
+      let finalStatus = 'success';
+      let finalError = '';
+
+      try {
+        const plan = queue && queue.plan ? queue.plan : planRarUpload(files);
+        let password = (queue && queue.password) || '';
+        let askedPassword = false;
+        let result = null;
+
+        for (;;) {
+          try {
+            result = await uploadRarAttempt(plan, password, queue);
+            break;
+          } catch (err) {
+            if (state.uploadAbort || isCancelledError(err.message)) throw err;
+            if (!isRarPasswordError(err.message)) throw err;
+            if (queue) throw new Error('password required');
+
+            state.uploadJobCancel = false;
+            state.uploadJobVerb = '';
+            updateJobRole({ busy: false });
+            const nextPassword = prompt(askedPassword ?
+              'Wrong RAR password. Try again' :
+              'RAR password may be required');
+            if (nextPassword === null) {
+              throw new Error('RAR password required');
+            }
+            password = nextPassword;
+            askedPassword = true;
+            state.uploadXhrs.clear();
+          }
+        }
+
+        await refresh();
+        toast('Extracted ' + Number(result.files || 0) + ' file(s)', 'ok');
+      } catch (err) {
+        finalStatus = state.uploadAbort || isCancelledError(err.message) ? 'cancelled' : 'failed';
+        finalError = finalStatus === 'cancelled' ? 'upload cancelled' : err.message;
+        if (queue) {
+          await activityComplete(queue, finalStatus,
+            finalError, 0, (queue && queue.totalBytes) || 0, 0, 1);
+        }
+        if (state.uploadAbort || isCancelledError(err.message)) {
+          toast('RAR upload cancelled', 'err');
+        } else {
+          toast('rar: ' + err.message, 'err');
+        }
+        await refresh().catch(() => {});
+      } finally {
+        state.uploadBusy = false;
+        state.uploadJobCancel = false;
+        state.uploadJobVerb = '';
+        state.uploadXhrs.clear();
+        updateJobRole({ busy: false });
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 1600);
+      }
+      return { status: finalStatus, error: finalError };
+    }
+
+    async function runUploadFiles(files, queue) {
+      if (!files || !files.length || state.uploadBusy) {
+        return { status: 'failed', error: 'upload is busy' };
+      }
+      state.uploadBusy = true;
+      state.uploadAbort = false;
+      state.uploadJobCancel = false;
+      state.uploadJobVerb = '';
+      state.uploadXhrs.clear();
+      state.activeActivityProgressAt = 0;
+      let ok = 0;
+      let failed = 0;
+      let completedBytes = 0;
+      let activeBytes = 0;
+      let completedFiles = 0;
+      let nextIndex = 0;
+      let lastName = 'Preparing';
+      let lastError = '';
+      let lastProgressAt = 0;
+      let progressTimer = 0;
+      const totalBytes = files.reduce((sum, file) => sum + (file.size || 0), 0);
+      const startedAt = Date.now();
+      const basePath = (queue && queue.basePath) || state.path;
+      const entries = files.map((file, index) => {
+        const relPath = file.webkitRelativePath ?
+          file.webkitRelativePath.split('/').slice(0, -1).join('/') : '';
+        return { file, index, relPath, loaded: 0, key: relPath + '\0' + file.name };
+      });
+      const seenTargets = new Set();
+      let duplicateTargets = false;
+      for (const entry of entries) {
+        if (seenTargets.has(entry.key)) duplicateTargets = true;
+        seenTargets.add(entry.key);
+      }
+      const concurrency = duplicateTargets ? 1 : Math.min(UPLOAD_CONCURRENCY, entries.length);
+
+      function flushProgress(force) {
+        if (force && progressTimer) {
+          clearTimeout(progressTimer);
+          progressTimer = 0;
+        }
+        const now = Date.now();
+        if (!force && now - lastProgressAt < UPLOAD_PROGRESS_INTERVAL) {
+          if (!progressTimer) {
+            progressTimer = setTimeout(() => {
+              progressTimer = 0;
+              flushProgress(true);
+            }, UPLOAD_PROGRESS_INTERVAL - (now - lastProgressAt));
+          }
+          return;
+        }
+        lastProgressAt = now;
+        updateUploadJob(completedBytes + activeBytes, totalBytes, startedAt,
+          completedFiles, entries.length, lastName, failed, state.uploadAbort);
+        activityProgress(queue, completedBytes + activeBytes, totalBytes,
+          completedFiles, failed, force);
+      }
+
+      async function uploadWorker() {
+        while(!state.uploadAbort) {
+          const entry = entries[nextIndex++];
+          if (!entry) break;
+          lastName = entry.file.name;
+          flushProgress(false);
+          try {
+            await uploadOne(entry.file, basePath, entry.relPath, (loaded) => {
+              activeBytes += loaded - entry.loaded;
+              entry.loaded = loaded;
+              lastName = entry.file.name;
+              flushProgress(false);
+            }, entries.length === 1, queue);
+            activeBytes -= entry.loaded;
+            entry.loaded = 0;
+            completedBytes += entry.file.size || 0;
+            completedFiles++;
+            ok++;
+            lastName = entry.file.name;
+            flushProgress(true);
+            if (entries.length === 1 || ok === entries.length || ok % 10 === 0) {
+              toast('Uploaded ' + ok + ' / ' + entries.length, 'ok');
+            }
+          } catch (err) {
+            activeBytes -= entry.loaded;
+            entry.loaded = 0;
+            lastName = entry.file.name;
+            if (state.uploadAbort || isCancelledError(err.message)) {
+              state.uploadAbort = true;
+              lastError = 'upload cancelled';
+              flushProgress(true);
+              break;
+            }
+            failed++;
+            completedFiles++;
+            lastError = err.message || 'upload failed';
+            flushProgress(true);
+            toast('upload: ' + err.message, 'err');
+          }
+        }
+      }
+
+      updateUploadJob(0, totalBytes, startedAt, 0, entries.length, 'Preparing', failed, false);
+      await Promise.all(Array.from({ length: concurrency }, () => uploadWorker()));
+
       state.uploadBusy = false;
-      state.uploadXhr = null;
+      state.uploadXhrs.clear();
+      if (progressTimer) clearTimeout(progressTimer);
+      const finalStatus = state.uploadAbort ? 'cancelled' : (failed ? 'failed' : 'success');
+      if (queue) {
+        await activityComplete(queue, finalStatus,
+          finalStatus === 'success' ? '' : (lastError || 'upload failed'),
+          completedBytes, totalBytes, ok, failed);
+      }
       await refresh();
       if (state.uploadAbort) {
         toast('Upload cancelled after ' + ok + ' file(s)', 'err');
@@ -1250,6 +3912,13 @@
       setTimeout(() => {
         if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
       }, 1600);
+      return {
+        status: finalStatus,
+        error: finalStatus === 'success' ? '' : (lastError || 'upload failed'),
+        copiedBytes: completedBytes,
+        doneItems: ok,
+        failedItems: failed
+      };
     }
 
     function pollJob() {
@@ -1272,11 +3941,20 @@
           fill.style.width = pct.toFixed(1) + '%';
           verb.textContent = job.verb || 'Working';
           text.textContent = jobProgressText(job);
+          updateJobRole(job);
+          if (state.activeQueueId && state.activeLeaseToken) {
+            activityProgress({
+              queueId: state.activeQueueId,
+              leaseToken: state.activeLeaseToken
+            }, Number(job.copiedBytes || 0), Number(job.totalBytes || 0),
+              Number(job.doneFiles || 0), Number(job.failedFiles || 0), false);
+          }
 
           if (!job.busy) {
             clearInterval(state.jobTimer);
             state.jobTimer = 0;
             if (job.error) toast(job.error, 'err');
+            else scheduleLogsReveal();
             setTimeout(() => box.classList.remove('show'), 1400);
           }
         } catch (err) {
@@ -1293,8 +3971,24 @@
     }
 
     async function boot() {
+      state.path = loadLastPath();
+      el('path').value = state.path;
+      decorateIconButtons();
+      attachBulkMenu();
+      pollControllerState();
+
       const placeRoot = el('places');
       const extra = [];
+
+      document.querySelectorAll('[data-side-mode]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (button.dataset.sideMode === 'activity') refreshLogs({
+            activate: true,
+            preserveSelection: true
+          });
+          else setSideMode('paths');
+        });
+      });
 
       try {
         const usb = await api('/api/fs/usb');
@@ -1318,10 +4012,9 @@
         if (event.key === 'Enter') refresh();
       });
 
-      el('new-folder').addEventListener('click', makeFolder);
-      el('rename').addEventListener('click', renameOne);
-      el('download').addEventListener('click', downloadSelected);
-      el('delete').addEventListener('click', deleteSelected);
+      el('multi-select').addEventListener('click', () => {
+        toggleMultiSelectLock();
+      });
       el('copy').addEventListener('click', () => transfer('copy'));
       el('move').addEventListener('click', () => transfer('move'));
       el('target-current').addEventListener('click', () => {
@@ -1338,8 +4031,16 @@
       el('job-cancel').addEventListener('click', () => {
         if (state.uploadBusy) {
           state.uploadAbort = true;
-          if (state.uploadXhr) state.uploadXhr.abort();
-          setJobBox('upload', 'Cancelling upload...', 0);
+          if (state.activeQueueId) {
+            fetch('/api/fs/activity/cancel?queueId=' +
+              encodeURIComponent(state.activeQueueId)).catch(() => {});
+          }
+          if (state.uploadJobCancel) {
+            fetch('/api/fs/job/cancel').catch(() => {});
+          }
+          Array.from(state.uploadXhrs).forEach((xhr) => xhr.abort());
+          setJobBox(state.uploadJobCancel ? (state.uploadJobVerb || 'unzip') : 'upload',
+            'Cancelling upload...', 0);
           return;
         }
         fetch('/api/fs/job/cancel').catch(() => {});
@@ -1357,14 +4058,45 @@
         el('folder-picker').value = '';
         el('folder-picker').click();
       });
+      el('upload-zip').addEventListener('click', () => {
+        el('zip-picker').value = '';
+        el('zip-picker').click();
+      });
+      el('upload-rar').addEventListener('click', () => {
+        el('rar-picker').value = '';
+        el('rar-picker').click();
+      });
       el('file-picker').addEventListener('change', (event) => {
-        uploadFiles(Array.from(event.target.files || []));
+        enqueueUploadFiles(Array.from(event.target.files || []));
       });
       el('folder-picker').addEventListener('change', (event) => {
-        uploadFiles(Array.from(event.target.files || []));
+        enqueueUploadFiles(Array.from(event.target.files || []));
+      });
+      el('zip-picker').addEventListener('change', (event) => {
+        enqueueZipUpload((event.target.files || [])[0]);
+      });
+      el('rar-picker').addEventListener('change', (event) => {
+        enqueueRarUpload(Array.from(event.target.files || []));
+      });
+      document.addEventListener('click', (event) => {
+        if (!insideClass(event.target, 'row-actions')) closeRowMenus();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closeLogModal();
+          closeRowMenus();
+        }
+      });
+      document.addEventListener('visibilitychange', warnIfUploadBackgrounded);
+      el('log-modal-close').addEventListener('click', closeLogModal);
+      el('log-modal').addEventListener('click', (event) => {
+        if (event.target === el('log-modal')) closeLogModal();
       });
 
       await refresh();
+      drawLogs();
+      startActivityPolling();
+      refreshLogs({ activate: false, preserveSelection: true, quiet: true });
 
       api('/api/status').then((info) => {
         const status = el('status');

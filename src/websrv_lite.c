@@ -26,6 +26,8 @@
 
 #define HEADER_MAX 65536
 #define CONTROL_TOKEN "bs5fm-local-reload"
+#define CLIENT_RCVBUF_SIZE (1024 * 1024)
+#define CLIENT_THREAD_STACK_SIZE (1024 * 1024)
 
 
 static int             g_websrv_srvfd = -1;
@@ -331,6 +333,18 @@ dispatch_request(const http_request_t *req, const char *initial_body,
       return transfer_upload_request(req, initial_body, initial_size,
                                      content_size);
     }
+    if(!strcmp(req->path, "/api/fs/upload-chunk")) {
+      return transfer_upload_chunk_request(req, initial_body, initial_size,
+                                           content_size);
+    }
+    if(!strcmp(req->path, "/api/fs/upload-zip")) {
+      return transfer_upload_zip_request(req, initial_body, initial_size,
+                                         content_size);
+    }
+    if(!strcmp(req->path, "/api/fs/upload-rar")) {
+      return transfer_upload_rar_request(req, initial_body, initial_size,
+                                         content_size);
+    }
     return websrv_send_error_json(req->fd, 404, "not found");
   }
 
@@ -341,6 +355,15 @@ dispatch_request(const http_request_t *req, const char *initial_body,
 typedef struct client_arg {
   int fd;
 } client_arg_t;
+
+
+static void
+tune_client_socket(int fd) {
+#ifdef SO_RCVBUF
+  int size = CLIENT_RCVBUF_SIZE;
+  setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
+#endif
+}
 
 
 static void *
@@ -374,7 +397,8 @@ client_thread(void *arg) {
     goto done;
   }
 
-  buf[header_end] = 0;
+  /* Terminate headers without overwriting the first buffered body byte. */
+  buf[header_end - 2] = 0;
 
   char method[8];
   char target[2048];
@@ -489,11 +513,13 @@ websrv_listen(unsigned short port, websrv_ready_cb_t ready_cb,
       continue;
     }
     client->fd = connfd;
+    tune_client_socket(connfd);
 
     pthread_t thread;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&attr, CLIENT_THREAD_STACK_SIZE);
     if(pthread_create(&thread, &attr, client_thread, client) != 0) {
       close(connfd);
       free(client);
