@@ -1,5 +1,5 @@
 /*
- * BFpilot - tiny single-purpose HTTP server.
+ * File Explorer - tiny single-purpose HTTP server.
  */
 
 #include <ctype.h>
@@ -275,7 +275,7 @@ status_request(const http_request_t *req) {
   time_t now = time(NULL);
   int n = snprintf(body, sizeof(body),
                    "{\"ok\":true,"
-                   "\"name\":\"BFpilot\","
+                   "\"name\":\"File Explorer\","
                    "\"tag\":\"%s\","
                    "\"version\":\"%s\","
                    "\"pid\":%ld,"

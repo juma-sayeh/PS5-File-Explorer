@@ -1,5 +1,5 @@
 /*
- * BFpilot - tiny HTTP server helpers.
+ * File Explorer - tiny HTTP server helpers.
  */
 
 #pragma once

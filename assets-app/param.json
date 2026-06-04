@@ -1,11 +1,11 @@
 {
   "applicationCategoryType": 0,
-  "titleId": "BFPL00001",
+  "titleId": "P5FE00001",
   "deeplinkUri": "http://127.0.0.1:5905/",
   "localizedParameters": {
     "defaultLanguage": "en-US",
     "en-US": {
-      "titleName": "BFpilot"
+      "titleName": "File Explorer"
     }
   }
 }

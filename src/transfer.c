@@ -1,5 +1,5 @@
 /*
- * BFpilot - file-manager copy/move/delete primitives and API.
+ * File Explorer - file-manager copy/move/delete primitives and API.
  */
 
 #include <ctype.h>
@@ -31,7 +31,7 @@
 #define COPY_BUF_SIZE   (1024 * 1024)
 #define UPLOAD_BUF_SIZE (1024 * 1024)
 #define UPLOAD_CHUNK_MAX (16 * 1024 * 1024)
-#define OP_LOG_DIR "/data/BFpilot/logs"
+#define OP_LOG_DIR "/data/FileExplorer/logs"
 #define OP_LOG_READ_MAX (512 * 1024)
 #define ACTIVITY_MAX 128
 #define ACTIVITY_HEARTBEAT_TIMEOUT 20
@@ -221,7 +221,7 @@ log_slug(char *out, size_t out_size, const char *src) {
 
 static int
 operation_log_dir_ready(void) {
-  mkdir("/data/BFpilot", 0777);
+  mkdir("/data/FileExplorer", 0777);
   if(mkdir(OP_LOG_DIR, 0777) != 0 && errno != EEXIST) return -1;
   return 0;
 }
@@ -283,7 +283,7 @@ operation_log_write_at(const char *path, const char *result, const char *verb,
 
   FILE *f = fopen(path, "w");
   if(!f) return;
-  fprintf(f, "BFpilot operation log\n");
+  fprintf(f, "File Explorer operation log\n");
   fprintf(f, "Result: %s\n", result && *result ? result : "unknown");
   fprintf(f, "Operation: %s\n", verb && *verb ? verb : "operation");
   fprintf(f, "Target: %s\n", target && *target ? target : "-");

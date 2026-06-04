@@ -1,5 +1,5 @@
 /*
- * BFpilot - embedded asset registry.
+ * File Explorer - embedded asset registry.
  */
 
 #pragma once

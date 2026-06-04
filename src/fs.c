@@ -1,5 +1,5 @@
 /*
- * BFpilot - direct file and directory serving.
+ * File Explorer - direct file and directory serving.
  */
 
 #include <dirent.h>

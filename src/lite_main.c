@@ -1,5 +1,5 @@
 /*
- * BFpilot - minimal PS5 browser file manager payload.
+ * File Explorer - minimal PS5 browser file manager payload.
  *
  * Runtime surface is intentionally small: one HTTP file-manager server,
  * startup notification, and no companion side services.
@@ -173,7 +173,8 @@ handoff_existing_server(void) {
   if(local_http_get("/api/status", response, sizeof(response)) != 0) {
     return 0;
   }
-  if(!strstr(response, "\"name\":\"BFpilot\"") &&
+  if(!strstr(response, "\"name\":\"File Explorer\"") &&
+     !strstr(response, "\"name\":\"BFpilot\"") &&
      !strstr(response, "\"name\":\"BS5FileManager\"")) {
     return 0;
   }
@@ -184,7 +185,7 @@ handoff_existing_server(void) {
   }
 
   if(old_server_busy()) {
-    bfpilot_notify("BFpilot reload skipped",
+    bfpilot_notify("File Explorer reload skipped",
                    "Old file operation is still running");
     return -1;
   }
@@ -197,22 +198,22 @@ handoff_existing_server(void) {
      strstr(shutdown_response, "200 OK") &&
      strstr(shutdown_response, "\"ok\":true") &&
      wait_for_old_server_down()) {
-    bfpilot_notify("BFpilot reloaded", "Old listener stopped cleanly");
+    bfpilot_notify("File Explorer reloaded", "Old listener stopped cleanly");
     return 1;
   }
 
   if(kill((pid_t)old_pid, SIGTERM) == 0 && wait_for_old_server_down()) {
-    bfpilot_notify("BFpilot reloaded", "Old listener stopped");
+    bfpilot_notify("File Explorer reloaded", "Old listener stopped");
     return 1;
   }
 
   kill((pid_t)old_pid, SIGKILL);
   if(wait_for_old_server_down()) {
-    bfpilot_notify("BFpilot reloaded", "Old listener was replaced");
+    bfpilot_notify("File Explorer reloaded", "Old listener was replaced");
     return 1;
   }
 
-  bfpilot_notify("BFpilot reload failed",
+  bfpilot_notify("File Explorer reload failed",
                  "Could not stop old listener on port 5905");
   return -1;
 }
@@ -229,7 +230,7 @@ on_web_ready(unsigned short port, void *arg) {
   printf("  web ui ready: http://%s:%u/\n", state->ip, (unsigned int)port);
 
   if(!state->notified) {
-    bfpilot_notify("BFpilot started", url);
+    bfpilot_notify("File Explorer started", url);
     state->notified = 1;
   }
 }
@@ -245,13 +246,13 @@ main(int argc, char **argv) {
   detect_lan_ip(ready.ip, sizeof(ready.ip));
 
   puts(".----------------------------------------------.");
-  puts("|  BFpilot                                     |");
+  puts("|  File Explorer                               |");
   printf("|  %-18s  browser file manager        |\n", VERSION_TAG);
   puts("'----------------------------------------------'");
   puts("");
   puts("  active: standalone web file manager");
   puts("  scope: browse, upload, download, copy, move, delete, rename, mkdir");
-  puts("  ps5 app: BFpilot opens http://127.0.0.1:5905/");
+  puts("  ps5 app: File Explorer opens http://127.0.0.1:5905/");
   printf("  web ui: http://%s:%u/\n", ready.ip, (unsigned int)BFPILOT_WEB_PORT);
   puts("  inject/deploy port: 9021");
   puts("");
@@ -284,7 +285,7 @@ main(int argc, char **argv) {
       char msg[128];
       snprintf(msg, sizeof(msg), "port %u error %d, retrying",
                (unsigned int)BFPILOT_WEB_PORT, -rc);
-      bfpilot_notify("BFpilot could not start", msg);
+      bfpilot_notify("File Explorer could not start", msg);
       ready.notified = 1;
     }
     sleep(rc == -EADDRINUSE || rc == -EACCES ? 5 : 2);

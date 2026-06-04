@@ -1,5 +1,5 @@
 /*
- * BFpilot - install the PS5 home-screen web launcher tile.
+ * File Explorer - install the PS5 home-screen web launcher tile.
  */
 
 #include <errno.h>
@@ -17,15 +17,16 @@
 #include "app_installer.h"
 #include "notify.h"
 
-#define BFPILOT_APP_TITLE_ID "BFPL00001"
+#define BFPILOT_APP_TITLE_ID "P5FE00001"
 #define BFPILOT_INVALID_APP_TITLE_ID "BFPILOT01"
+#define BFPILOT_PRE_RENAME_APP_TITLE_ID "BFPL00001"
 #define BFPILOT_LEGACY_APP_TITLE_ID "BSFM00001"
 #define BFPILOT_OLD_LEGACY_APP_TITLE_ID "BS5F00001"
 #define BFPILOT_APP_ROOT "/user/app"
 #define BFPILOT_APP_PARENT BFPILOT_APP_ROOT "/"
-#define BFPILOT_DATA_DIR "/data/BFpilot"
+#define BFPILOT_DATA_DIR "/data/FileExplorer"
 #define BFPILOT_MARKER_PATH BFPILOT_DATA_DIR "/launcher.ok"
-#define BFPILOT_INSTALL_MARKER "bfpilot-launcher-v2\n"
+#define BFPILOT_INSTALL_MARKER "file-explorer-launcher-v1\n"
 
 #define INCASSET(name, file)                                                   \
   __asm__(".section .rodata\n"                                                 \
@@ -184,23 +185,25 @@ bfpilot_install_app_if_needed(void) {
                                      sizeof(g_install_marker) - 1);
 
   if(app_exists && assets_changed) {
-    bfpilot_notify("BFpilot app", "Updating PS5 home-screen launcher");
+    bfpilot_notify("File Explorer app", "Updating PS5 home-screen launcher");
   } else if(app_exists) {
-    bfpilot_notify("BFpilot app", "Refreshing PS5 home-screen launcher");
+    bfpilot_notify("File Explorer app", "Refreshing PS5 home-screen launcher");
   } else {
-    bfpilot_notify("BFpilot app", "Installing PS5 home-screen launcher");
+    bfpilot_notify("File Explorer app", "Installing PS5 home-screen launcher");
   }
 
   int err = sceAppInstUtilInitialize();
   if(err) {
     printf("  launcher install: sceAppInstUtilInitialize failed 0x%08x\n", err);
     snprintf(msg, sizeof(msg), "AppInst init failed 0x%08x", err);
-    bfpilot_notify("BFpilot app failed", msg);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
   int uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_APP_TITLE_ID);
-  printf("  launcher install: refresh BFpilot tile 0x%08x\n", uninstall_err);
+  printf("  launcher install: refresh File Explorer tile 0x%08x\n", uninstall_err);
+  uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_PRE_RENAME_APP_TITLE_ID);
+  printf("  launcher install: remove BFpilot tile 0x%08x\n", uninstall_err);
   uninstall_err = sceAppInstUtilAppUnInstall(BFPILOT_INVALID_APP_TITLE_ID);
   printf("  launcher install: remove invalid BFpilot tile 0x%08x\n",
          uninstall_err);
@@ -221,27 +224,27 @@ bfpilot_install_app_if_needed(void) {
   if(mkdir_if_needed(app_dir) != 0 || mkdir_if_needed(sce_sys_dir) != 0) {
     printf("  launcher install: mkdir failed errno %d\n", errno);
     snprintf(msg, sizeof(msg), "mkdir failed errno %d", errno);
-    bfpilot_notify("BFpilot app failed", msg);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
   if(write_file(param_path, bfpilot_param_json, bfpilot_param_json_size) != 0) {
     printf("  launcher install: failed writing %s\n", param_path);
-    bfpilot_notify("BFpilot app failed", "could not write param.json");
+    bfpilot_notify("File Explorer app failed", "could not write param.json");
     return -1;
   }
 
   if(write_file(icon_path, bfpilot_icon0_png, bfpilot_icon0_png_size) != 0) {
     printf("  launcher install: failed writing %s\n", icon_path);
-    bfpilot_notify("BFpilot app failed", "could not write icon0.png");
+    bfpilot_notify("File Explorer app failed", "could not write icon0.png");
     return -1;
   }
 
   err = install_app(BFPILOT_APP_TITLE_ID, BFPILOT_APP_PARENT);
   if(err) {
     printf("  launcher install: install_app failed 0x%08x\n", err);
-    snprintf(msg, sizeof(msg), "register BFPL00001 failed 0x%08x", err);
-    bfpilot_notify("BFpilot app failed", msg);
+    snprintf(msg, sizeof(msg), "register P5FE00001 failed 0x%08x", err);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
@@ -254,7 +257,7 @@ bfpilot_install_app_if_needed(void) {
            BFPILOT_MARKER_PATH);
   }
 
-  bfpilot_notify("BFpilot app ready",
-                 "Tile BFPL00001 opens http://127.0.0.1:5905/");
+  bfpilot_notify("File Explorer app ready",
+                 "Tile P5FE00001 opens http://127.0.0.1:5905/");
   return 1;
 }

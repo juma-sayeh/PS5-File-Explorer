@@ -1,5 +1,5 @@
 /*
- * BFpilot - MIME lookup.
+ * File Explorer - MIME lookup.
  */
 
 #pragma once

@@ -1,5 +1,5 @@
 /*
- * BFpilot - PS5 notification helpers.
+ * File Explorer - PS5 notification helpers.
  */
 
 #pragma once

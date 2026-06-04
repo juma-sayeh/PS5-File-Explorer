@@ -1,18 +1,20 @@
-# BFpilot
+# PS5 File Explorer
 
-BFpilot is a small PS5 payload that gives you a browser-based file manager on
-port `5905`.
+File Explorer is a small PS5 payload that gives you a browser-based file
+manager on port `5905`.
 
 It is meant to stay simple: no PKG installer, no FTP daemon, no mounting tools,
 and no extra payload bundle. The payload starts one web server, refreshes a PS5
 home-screen launcher tile, and lets the PS5 do file operations locally.
 
-Current release: `v0.2.0`
+Current release: `file-explorer-v0.2.0`
+
+This repository is a fork of ItsBlurf/BFpilot. See [FORK.md](FORK.md).
 
 ## What It Does
 
 - Runs a file-manager web UI at `http://<PS5_IP>:5905/`
-- Installs or refreshes a `BFpilot` launcher tile on the PS5 home screen
+- Installs or refreshes a `File Explorer` launcher tile on the PS5 home screen
 - Uses a dark-only UI
 - Browses, uploads, downloads, copies, moves, renames, creates folders, and deletes
 - Shows progress for copy, move, delete, and browser uploads
@@ -43,17 +45,17 @@ http://<PS5_IP>:5905/
 The payload stores launcher marker data in:
 
 ```text
-/data/BFpilot
+/data/FileExplorer
 ```
 
 The PS5 launcher app itself is installed under:
 
 ```text
-/user/app/BFPL00001
+/user/app/P5FE00001
 ```
 
 The installer removes older launcher title IDs from previous names before
-registering `BFPL00001`, so stale tiles from earlier builds do not get in the
+registering `P5FE00001`, so stale tiles from earlier builds do not get in the
 way.
 
 ## Project Layout
@@ -92,7 +94,7 @@ make
 Output:
 
 ```text
-bfpilot.elf
+file-explorer.elf
 ```
 
 Deploy helper:
@@ -103,13 +105,14 @@ make deploy PS5_HOST=<PS5_IP> PS5_PORT=9021
 
 ## Extra Notes
 
-BFpilot avoids kernel-level cleanup and does not force-unload other payloads.
+File Explorer avoids kernel-level cleanup and does not force-unload other
+payloads.
 
-If you reinject while an older BFpilot or BS5FileManager instance is already
-running, the new payload checks whether a file job is active. If the old
-instance is idle, it asks it to shut down cleanly and then takes over port
-`5905`. If a copy, move, or delete is running, the new injection exits instead
-of interrupting the active job.
+If you reinject while an older File Explorer, BFpilot, or BS5FileManager
+instance is already running, the new payload checks whether a file job is
+active. If the old instance is idle, it asks it to shut down cleanly and then
+takes over port `5905`. If a copy, move, or delete is running, the new injection
+exits instead of interrupting the active job.
 
 Cancel is cooperative. Large operations may take a moment to stop, especially on
 external USB drives, but the job code checks for cancellation during scan, copy,

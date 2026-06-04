@@ -1,5 +1,5 @@
 /*
- * BFpilot - thin C ABI around RARLab UnRAR streaming extraction.
+ * File Explorer - thin C ABI around RARLab UnRAR streaming extraction.
  */
 
 #pragma once

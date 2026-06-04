@@ -1,5 +1,5 @@
 /*
- * BFpilot - shared archive staging and layout helpers.
+ * File Explorer - shared archive staging and layout helpers.
  */
 
 #include <ctype.h>
@@ -206,7 +206,7 @@ archive_backup_begin(archive_backup_ctx_t *ctx, const char *target,
   }
   snprintf(ctx->target, sizeof(ctx->target), "%s", target);
   ctx->enabled = 1;
-  fprintf(ctx->manifest, "BFpilot archive backup v1\n");
+  fprintf(ctx->manifest, "File Explorer archive backup v1\n");
   fprintf(ctx->manifest, "Target: %s\n", target);
   fprintf(ctx->manifest, "Archive: %s\n", archive_name ? archive_name : "");
   fprintf(ctx->manifest, "Created: %ld\n", (long)now);

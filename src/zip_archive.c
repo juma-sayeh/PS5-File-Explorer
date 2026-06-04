@@ -1,5 +1,5 @@
 /*
- * BFpilot - ZIP archive upload and extraction helpers.
+ * File Explorer - ZIP archive upload and extraction helpers.
  */
 
 #include <ctype.h>

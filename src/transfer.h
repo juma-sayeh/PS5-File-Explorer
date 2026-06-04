@@ -1,5 +1,5 @@
 /*
- * BFpilot - file-manager API.
+ * File Explorer - file-manager API.
  */
 
 #pragma once

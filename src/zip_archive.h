@@ -1,5 +1,5 @@
 /*
- * BFpilot - ZIP and bounded archive pipe internals.
+ * File Explorer - ZIP and bounded archive pipe internals.
  */
 
 #pragma once

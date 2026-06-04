@@ -1,5 +1,5 @@
 /*
- * BFpilot - shared archive staging and layout helpers.
+ * File Explorer - shared archive staging and layout helpers.
  */
 
 #pragma once

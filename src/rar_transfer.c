@@ -1,5 +1,5 @@
 /*
- * BFpilot - RAR archive upload and extraction requests.
+ * File Explorer - RAR archive upload and extraction requests.
  */
 
 #include <ctype.h>
@@ -129,7 +129,7 @@ static void
 rar_log_event(const char *fmt, ...) {
   pthread_mutex_lock(&g_rar_log_lock);
 
-  mkdir("/data/BFpilot", 0777);
+  mkdir("/data/FileExplorer", 0777);
   FILE *f = fopen(RAR_LOG_PATH, "a");
   if(f) {
     time_t now = time(NULL);

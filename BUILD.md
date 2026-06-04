@@ -1,6 +1,6 @@
-# BFpilot Build Manual
+# File Explorer Build Manual
 
-This project builds a PS5 payload ELF named `bfpilot.elf`.
+This project builds a PS5 payload ELF named `file-explorer.elf`.
 
 ## Requirements
 
@@ -30,7 +30,7 @@ brew install llvm@18
 From the repo root:
 
 ```sh
-cd /Users/jumasayeh/Developer/BFpilot
+cd /path/to/PS5-File-Explorer
 
 make clean PS5_PAYLOAD_SDK=/Users/jumasayeh/Developer/ps5-payload-sdk
 
@@ -44,7 +44,7 @@ make \
 Output:
 
 ```text
-bfpilot.elf
+file-explorer.elf
 ```
 
 Generated asset C files are written under:
@@ -53,14 +53,14 @@ Generated asset C files are written under:
 gen/assets/
 ```
 
-Both `bfpilot.elf` and `gen/` are ignored by git.
+Both `file-explorer.elf` and `gen/` are ignored by git.
 
 ## Verify Build Output
 
 ```sh
-ls -lh bfpilot.elf
-file bfpilot.elf
-shasum -a 256 bfpilot.elf
+ls -lh file-explorer.elf
+file file-explorer.elf
+shasum -a 256 file-explorer.elf
 ```
 
 Expected file type:
@@ -110,28 +110,28 @@ ls -l /opt/homebrew/opt/llvm@18/bin/clang
 If the PS5 is running `ftpsrv.elf` on port `2121`, replace the Payload Manager copy:
 
 ```sh
-curl -T /Users/jumasayeh/Developer/BFpilot/bfpilot.elf \
-  ftp://192.168.1.172:2121/data/pldmgr/payloads/bfpilot/bfpilot.elf
+curl -T /path/to/PS5-File-Explorer/file-explorer.elf \
+  ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf
 ```
 
 Verify the uploaded file:
 
 ```sh
-curl ftp://192.168.1.172:2121/data/pldmgr/payloads/bfpilot/bfpilot.elf \
-  -o /tmp/remote-bfpilot.elf
+curl ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf \
+  -o /tmp/remote-file-explorer.elf
 
 shasum -a 256 \
-  /Users/jumasayeh/Developer/BFpilot/bfpilot.elf \
-  /tmp/remote-bfpilot.elf
+  /path/to/PS5-File-Explorer/file-explorer.elf \
+  /tmp/remote-file-explorer.elf
 ```
 
 The hashes should match.
 
-After replacing the file, relaunch BFpilot from Payload Manager. Replacing the ELF on disk does not restart an already-running payload.
+After replacing the file, relaunch File Explorer from Payload Manager. Replacing the ELF on disk does not restart an already-running payload.
 
 ## Runtime URL
 
-BFpilot serves the web UI and API on:
+File Explorer serves the web UI and API on:
 
 ```text
 http://<PS5_IP>:5905/

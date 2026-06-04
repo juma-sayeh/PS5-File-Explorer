@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/icon.png">
-  <title>BFpilot</title>
+  <title>File Explorer</title>
   <style>
     :root {
       --paper: #090d12;
@@ -1156,7 +1156,7 @@
     <div class="top-inner">
       <img class="brand" src="/icon.png" alt="">
       <div class="title">
-        <strong>BFpilot</strong>
+        <strong>File Explorer</strong>
         <span id="build">File Manager</span>
       </div>
       <div class="status" id="status"><span class="dot"></span><span>Connecting</span></div>
@@ -1269,8 +1269,8 @@
     const ZIP_METHOD_DEFLATE = 8;
     const RAR_UPLOAD_MAGIC = 'BFPRAR01';
     const RAR_VOLUME_MAX = 128;
-    const LAST_PATH_COOKIE = 'bfpilot_last_path';
-    const ACTIVITY_CLIENT_KEY = 'bfpilot_activity_client_id';
+    const LAST_PATH_COOKIE = 'file_explorer_last_path';
+    const ACTIVITY_CLIENT_KEY = 'file_explorer_activity_client_id';
     const ACTIVITY_POLL_MS = 1200;
 
     const state = {
@@ -1936,7 +1936,7 @@
       if (!state.logs.length) {
         const empty = document.createElement('div');
         empty.className = 'log-entry';
-        empty.innerHTML = '<span class="log-status-icon"></span><span class="log-main"><strong>No activity yet</strong><span>Queued and finished operations will appear here.</span><span class="log-time">/data/BFpilot/logs</span></span>';
+        empty.innerHTML = '<span class="log-status-icon"></span><span class="log-main"><strong>No activity yet</strong><span>Queued and finished operations will appear here.</span><span class="log-time">/data/FileExplorer/logs</span></span>';
         list.appendChild(empty);
       }
 
@@ -4102,7 +4102,7 @@
         const status = el('status');
         status.classList.add('ready');
         status.querySelector('span:last-child').textContent = 'Ready';
-        el('build').textContent = (info.tag || 'bfpilot') + ' / port 5905';
+        el('build').textContent = (info.tag || 'file-explorer') + ' / port 5905';
       }).catch(() => {
         el('status').querySelector('span:last-child').textContent = 'Offline';
       });

@@ -1,5 +1,5 @@
 /*
- * BFpilot - direct file serving helpers.
+ * File Explorer - direct file serving helpers.
  */
 
 #pragma once

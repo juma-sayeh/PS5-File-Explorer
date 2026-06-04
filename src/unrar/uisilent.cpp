@@ -1,5 +1,5 @@
 /*
- * The silent UnRAR UI normally discards all messages. BFpilot keeps the last
+ * The silent UnRAR UI normally discards all messages. File Explorer keeps the last
  * error message so the HTTP layer can report useful extraction failures.
  */
 #ifdef BFPILOT_UNRAR_STREAM

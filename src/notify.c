@@ -1,5 +1,5 @@
 /*
- * BFpilot - PS5 notification helpers.
+ * File Explorer - PS5 notification helpers.
  */
 
 #include <stdbool.h>
@@ -41,7 +41,7 @@ notify_debug(const char *message, const char *submessage) {
 void
 bfpilot_notify(const char *message, const char *submessage) {
   char payload[4096];
-  const char *msg = message ? message : "BFpilot";
+  const char *msg = message ? message : "File Explorer";
   const char *sub = submessage ? submessage : "";
 
   snprintf(payload, sizeof(payload),

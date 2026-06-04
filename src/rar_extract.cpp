@@ -1,5 +1,5 @@
 /*
- * BFpilot - UnRAR streaming adapter.
+ * File Explorer - UnRAR streaming adapter.
  */
 
 #include "rar_extract.h"

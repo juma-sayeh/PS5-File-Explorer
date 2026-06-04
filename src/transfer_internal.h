@@ -1,5 +1,5 @@
 /*
- * BFpilot - private file-manager interfaces shared by transfer modules.
+ * File Explorer - private file-manager interfaces shared by transfer modules.
  */
 
 #pragma once

@@ -1,5 +1,5 @@
 /*
- * BFpilot - embedded static assets.
+ * File Explorer - embedded static assets.
  */
 
 #include <limits.h>
