@@ -297,6 +297,12 @@
       color: #dcd3ff;
     }
 
+    button.upload-action.install {
+      border-color: #756128;
+      background: #211b0e;
+      color: #f8df8a;
+    }
+
     button.upload-action:hover:not(:disabled),
     button.upload-action:focus-visible {
       background: #163a33;
@@ -309,6 +315,12 @@
       color: #f3f0ff;
     }
 
+    button.upload-action.install:hover:not(:disabled),
+    button.upload-action.install:focus-visible {
+      background: #302613;
+      color: #fff4bd;
+    }
+
     button.upload-action svg {
       width: 18px;
       height: 18px;
@@ -318,6 +330,27 @@
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+
+    .help-action {
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-color: #385063;
+      background: #101923;
+      color: #cfe8f6;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .help-action:hover:not(:disabled),
+    .help-action:focus-visible {
+      background: #162333;
+      color: #ffffff;
     }
 
     .count {
@@ -560,6 +593,10 @@
       right: auto;
       top: 36px;
       z-index: 20;
+    }
+
+    #install-menu {
+      width: 190px;
     }
 
     .name,
@@ -1183,10 +1220,18 @@
 
       <div class="actions">
         <button id="multi-select" aria-pressed="false">Multi Select</button>
-        <button id="upload-files" class="upload-action" data-icon="upload-file">Upload Files</button>
-        <button id="upload-folder" class="upload-action" data-icon="upload-folder">Upload Folder</button>
-        <button id="upload-zip" class="upload-action archive" data-icon="upload-zip">Upload Zip</button>
-        <button id="upload-rar" class="upload-action archive" data-icon="upload-rar">Upload RAR</button>
+        <span class="row-actions toolbar-actions">
+          <button id="upload-menu-button" class="upload-action menu-trigger" type="button"
+            data-icon="upload-file" aria-haspopup="menu" aria-expanded="false">Upload</button>
+          <span id="upload-menu" class="row-menu toolbar-menu" role="menu"></span>
+        </span>
+        <span class="row-actions toolbar-actions">
+          <button id="install-menu-button" class="upload-action archive menu-trigger" type="button"
+            data-icon="extract" aria-haspopup="menu" aria-expanded="false">Extract</button>
+          <button id="extract-help" class="help-action" type="button"
+            aria-label="Explain extract flow" title="Extract flow">?</button>
+          <span id="install-menu" class="row-menu toolbar-menu" role="menu"></span>
+        </span>
         <span id="selection" class="count">0 selected</span>
         <span id="bulk-actions" class="row-actions toolbar-actions"></span>
       </div>
@@ -1826,6 +1871,8 @@
       const operation = fields.Operation || activityKindLabel((log && (log.kind || log.operation)) || '');
       const error = fields.Error || (log && log.error) || '';
       const logName = (log && (log.logName || log.name)) || '-';
+      const targetPath = activityTargetPath(log, fields);
+      const homebrewApp = canPrepareHomebrew(log, fields, result, operation);
 
       title.textContent = operation + ' - ' + logResultLabel(result);
       body.textContent = '';
@@ -1833,7 +1880,7 @@
       const rows = [
         ['Result', logResultLabel(result)],
         ['Operation', operation],
-        ['Target', fields.Target || (log && (log.target || log.destPath)) || '-'],
+        ['Target', targetPath || '-'],
         ['Name', (log && log.displayName) || '-'],
         ['Queue ID', (log && log.source !== 'log' && log.queueId) || '-'],
         ['Started', fields.Started ? formatLogEpoch(fields.Started) : formatDate(Number(log && log.startedAt || 0))],
@@ -1850,6 +1897,7 @@
         ['Log file', logName]
       ];
       if (error && error !== 'none') rows.splice(3, 0, ['Error', error]);
+      if (homebrewApp) rows.splice(3, 0, ['Homebrew app', pathBaseName(targetPath)]);
 
       const grid = document.createElement('div');
       grid.className = 'detail-grid';
@@ -1874,6 +1922,14 @@
         retry.addEventListener('click', () => retryActivity(log));
         actions.appendChild(retry);
       }
+      if (homebrewApp) {
+        const prepare = document.createElement('button');
+        prepare.type = 'button';
+        prepare.className = 'primary';
+        prepare.textContent = 'Prepare for Homebrew';
+        prepare.addEventListener('click', () => prepareHomebrewFromActivity(log, fields));
+        actions.appendChild(prepare);
+      }
       if (actions.childNodes.length) body.appendChild(actions);
 
       const pre = document.createElement('pre');
@@ -1889,6 +1945,27 @@
 
     function closeLogModal() {
       el('log-modal').classList.add('hidden');
+    }
+
+
+    function showInfoModal(titleText, message) {
+      const modal = el('log-modal');
+      const body = el('log-modal-body');
+      const title = el('log-modal-title');
+      title.textContent = titleText;
+      body.textContent = '';
+      const pre = document.createElement('pre');
+      pre.className = 'log-content';
+      pre.textContent = message;
+      body.appendChild(pre);
+      modal.classList.remove('hidden');
+    }
+
+
+    function showExtractHelp() {
+      showInfoModal('Extract Flow',
+        'Extract streams ZIP/RAR upload and extraction at the same time to reduce space needed. ' +
+        'If a PS5 app is found, Activity shows Prepare for Homebrew.');
     }
 
 
@@ -2064,6 +2141,70 @@
       return !!(item && item.source !== 'log' &&
         (status === 'failed' || status === 'cancelled' || status === 'abandoned') &&
         state.localQueue.has(item.queueId));
+    }
+
+
+    function activityTargetPath(item, fields) {
+      const candidates = [
+        fields && fields.Target,
+        item && item.target,
+        item && item.destPath
+      ];
+      for (const candidate of candidates) {
+        const path = String(candidate || '');
+        if (path && path !== '-') return path;
+      }
+      return '';
+    }
+
+
+    function pathBaseName(path) {
+      const clean = String(path || '').replace(/\/+$/, '');
+      const index = clean.lastIndexOf('/');
+      return index >= 0 ? clean.slice(index + 1) : clean;
+    }
+
+
+    function isArchiveActivity(item, fields, operation) {
+      const value = String((item && (item.kind || item.operation)) ||
+        (fields && fields.Operation) || operation || '').toLowerCase();
+      return value === 'zip' || value === 'rar' ||
+        value === 'unzip' || value === 'unrar';
+    }
+
+
+    function isHomebrewAppPath(path) {
+      return /^PPSA[0-9A-Z]{5}-app$/i.test(pathBaseName(path));
+    }
+
+
+    function canPrepareHomebrew(item, fields, result, operation) {
+      return result === 'success' &&
+        isArchiveActivity(item, fields, operation) &&
+        isHomebrewAppPath(activityTargetPath(item, fields));
+    }
+
+
+    async function prepareHomebrewFromActivity(item, fields) {
+      const path = activityTargetPath(item, fields);
+      if (!path || !isHomebrewAppPath(path)) {
+        toast('No prepared app folder was found for this activity', 'err');
+        return;
+      }
+      try {
+        setJobBox('chmod', 'Preparing for Homebrew', 0);
+        await api('/api/fs/chmod777?path=' + encodeURIComponent(path));
+        closeLogModal();
+        toast('Homebrew preparation started', 'ok');
+        scheduleLogsReveal();
+      } catch (err) {
+        toast('prepare: ' + err.message, 'err');
+        scheduleLogsReveal();
+      } finally {
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 900);
+      }
     }
 
 
@@ -2534,6 +2675,8 @@
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5"></path><path d="M9 7h2"></path><path d="M11 9h2"></path><path d="M9 11h2"></path><path d="M11 13h2"></path><path d="M12 19v-4"></path><path d="m9.5 17.5 2.5-2.5 2.5 2.5"></path></svg>';
       case 'upload-rar':
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5z"></path><path d="M8 5v14"></path><path d="M12 5v14"></path><path d="M16 5v14"></path><path d="M12 17v-5"></path><path d="m9.5 14.5 2.5-2.5 2.5 2.5"></path></svg>';
+      case 'install':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v5H5z"></path><path d="M7 9v11h10V9"></path><path d="M12 5v11"></path><path d="m8.5 12.5 3.5 3.5 3.5-3.5"></path></svg>';
       case 'extract':
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v5H5z"></path><path d="M7 9v11h10V9"></path><path d="M12 11v6"></path><path d="m9.5 14.5 2.5 2.5 2.5-2.5"></path></svg>';
       case 'backup':
@@ -2563,7 +2706,8 @@
       document.querySelectorAll('.row-menu.open').forEach((menu) => {
         if (menu === except) return;
         menu.classList.remove('open');
-        const button = menu.parentElement && menu.parentElement.querySelector('.row-more');
+        const button = menu.parentElement &&
+          menu.parentElement.querySelector('.row-more, .menu-trigger');
         if (button) button.setAttribute('aria-expanded', 'false');
       });
     }
@@ -2605,6 +2749,46 @@
         handler();
       });
       return button;
+    }
+
+    function attachToolbarMenu(buttonId, menuId, items) {
+      const button = el(buttonId);
+      const menu = el(menuId);
+      if (!button || !menu || menu.children.length) return;
+
+      for (const item of items) {
+        menu.appendChild(makeMenuButton(item.icon, item.label, item.handler));
+      }
+
+      menu.addEventListener('keydown', (event) => {
+        const buttons = Array.from(menu.querySelectorAll('button'));
+        const index = buttons.indexOf(document.activeElement);
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeRowMenus();
+          button.focus();
+          return;
+        }
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        buttons[(index + delta + buttons.length) % buttons.length].focus();
+      });
+
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const open = !menu.classList.contains('open');
+        closeRowMenus(menu);
+        menu.classList.toggle('open', open);
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          positionFloatingMenu(menu, button);
+          if (event.detail === 0 || button === document.activeElement) {
+            const first = menu.querySelector('button');
+            if (first) setTimeout(() => first.focus(), 0);
+          }
+        }
+      });
     }
 
     function attachRowMenu(row, entry) {
@@ -4028,6 +4212,10 @@
       el('multi-select').addEventListener('click', () => {
         toggleMultiSelectLock();
       });
+      el('extract-help').addEventListener('click', () => {
+        closeRowMenus();
+        showExtractHelp();
+      });
       el('copy').addEventListener('click', () => transfer('copy'));
       el('move').addEventListener('click', () => transfer('move'));
       el('target-current').addEventListener('click', () => {
@@ -4059,26 +4247,36 @@
         fetch('/api/fs/job/cancel').catch(() => {});
       });
 
-      el('upload-files').addEventListener('click', () => {
+      const pickUploadFiles = () => {
         el('file-picker').value = '';
         el('file-picker').click();
-      });
-      el('upload-folder').addEventListener('click', () => {
+      };
+      const pickUploadFolder = () => {
         if (!('webkitdirectory' in document.createElement('input'))) {
           toast('Folder picking is not available in this browser', 'err');
           return;
         }
         el('folder-picker').value = '';
         el('folder-picker').click();
-      });
-      el('upload-zip').addEventListener('click', () => {
+      };
+      const pickZipInstall = () => {
         el('zip-picker').value = '';
         el('zip-picker').click();
-      });
-      el('upload-rar').addEventListener('click', () => {
+      };
+      const pickRarInstall = () => {
         el('rar-picker').value = '';
         el('rar-picker').click();
-      });
+      };
+
+      attachToolbarMenu('upload-menu-button', 'upload-menu', [
+        { icon: 'upload-file', label: 'Upload Files', handler: pickUploadFiles },
+        { icon: 'upload-folder', label: 'Upload Folder', handler: pickUploadFolder }
+      ]);
+      attachToolbarMenu('install-menu-button', 'install-menu', [
+        { icon: 'upload-zip', label: 'From ZIP File', handler: pickZipInstall },
+        { icon: 'upload-rar', label: 'From RAR', handler: pickRarInstall }
+      ]);
+
       el('file-picker').addEventListener('change', (event) => {
         enqueueUploadFiles(Array.from(event.target.files || []));
       });

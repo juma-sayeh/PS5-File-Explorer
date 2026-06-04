@@ -22,6 +22,9 @@ sce_resolve_symbol(const char *module, const char *symbol, void **out) {
   if(rc != 0) return rc;
 
   addr = (void *)kernel_dynlib_resolve(-1, handle, symbol);
+  if(!addr) {
+    addr = (void *)kernel_dynlib_dlsym(-1, handle, symbol);
+  }
   if(!addr) return -2;
 
   *out = addr;

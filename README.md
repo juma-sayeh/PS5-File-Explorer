@@ -24,10 +24,10 @@ compatibility:
 - Does not link launcher-only SCE libraries
 - Keeps notification attempts optional
 
-Only try `file-explorer-full.elf` after `file-explorer-core.elf` works on the
+Only try `file-explorer.elf` after `file-explorer-core.elf` works on the
 same firmware and loader.
 
-`file-explorer-full.elf` includes optional launcher tile support. Launcher
+`file-explorer.elf` includes optional launcher tile support. Launcher
 install may fail on some firmware, exploit, or loader combinations. That should
 not stop the file manager. If launcher install fails but port `5905` still
 works, use the web file manager directly from a browser.
@@ -36,7 +36,7 @@ works, use the web file manager directly from a browser.
 
 - Runs a file-manager web UI at `http://<PS5_IP>:5905/`
 - Builds `file-explorer-core.elf` for the safest firmware compatibility path
-- Builds `file-explorer-full.elf` for optional PS5 home-screen launcher support
+- Builds `file-explorer.elf` for optional PS5 home-screen launcher support
 - Installs or refreshes a `File Explorer` launcher tile in full mode
 - Browses, uploads, downloads, copies, moves, renames, creates folders, and deletes
 - Uploads ZIP and RAR archives and extracts them on the PS5
@@ -66,7 +66,7 @@ open http://<PS5_IP>:5905/api/diag
 If core works and you want the PS5 launcher tile:
 
 ```text
-send file-explorer-full.elf to <PS5_IP>:9021
+send file-explorer.elf to <PS5_IP>:9021
 open http://<PS5_IP>:5905/
 open http://<PS5_IP>:5905/api/diag
 ```
@@ -118,7 +118,7 @@ nonfatal if the web server remains reachable.
 ### Port `5905` Not Reachable
 
 - Confirm the payload sender reported a successful send to port `9021`.
-- Try `file-explorer-core.elf` before `file-explorer-full.elf`.
+- Try `file-explorer-core.elf` before `file-explorer.elf`.
 - Check whether another File Explorer, BFpilot, or BS5FileManager instance
   already owns port `5905`.
 - Open `/data/FileExplorer/log.txt` and look for `bind_5905`, `listen_5905`,
@@ -201,7 +201,7 @@ Outputs:
 
 ```text
 file-explorer-core.elf
-file-explorer-full.elf
+file-explorer.elf
 ```
 
 Deploy helper:

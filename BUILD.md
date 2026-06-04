@@ -3,7 +3,7 @@
 This project builds two PS5 payload ELFs:
 
 - `file-explorer-core.elf` for the safest firmware compatibility path.
-- `file-explorer-full.elf` for optional PS5 launcher tile support.
+- `file-explorer.elf` for optional PS5 launcher tile support.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Output:
 
 ```text
 file-explorer-core.elf
-file-explorer-full.elf
+file-explorer.elf
 ```
 
 Generated asset C files are written under:
@@ -60,9 +60,9 @@ The generated ELF files, build intermediates, and `gen/` are ignored by git.
 ## Verify Build Output
 
 ```sh
-ls -lh file-explorer-core.elf file-explorer-full.elf
-file file-explorer-core.elf file-explorer-full.elf
-shasum -a 256 file-explorer-core.elf file-explorer-full.elf
+ls -lh file-explorer-core.elf file-explorer.elf
+file file-explorer-core.elf file-explorer.elf
+shasum -a 256 file-explorer-core.elf file-explorer.elf
 ```
 
 Expected file type:
@@ -111,19 +111,19 @@ ls -l /opt/homebrew/opt/llvm@18/bin/clang
 If the PS5 is running `ftpsrv.elf` on port `2121`, replace the Payload Manager copy:
 
 ```sh
-curl -T /path/to/PS5-File-Explorer/file-explorer-full.elf \
-  ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer-full.elf
+curl -T /path/to/PS5-File-Explorer/file-explorer.elf \
+  ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf
 ```
 
 Verify the uploaded file:
 
 ```sh
-curl ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer-full.elf \
-  -o /tmp/remote-file-explorer-full.elf
+curl ftp://192.168.1.172:2121/data/pldmgr/payloads/file-explorer/file-explorer.elf \
+  -o /tmp/remote-file-explorer.elf
 
 shasum -a 256 \
-  /path/to/PS5-File-Explorer/file-explorer-full.elf \
-  /tmp/remote-file-explorer-full.elf
+  /path/to/PS5-File-Explorer/file-explorer.elf \
+  /tmp/remote-file-explorer.elf
 ```
 
 The hashes should match.

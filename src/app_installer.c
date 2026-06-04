@@ -13,13 +13,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <ps5/kernel.h>
+
 #include "app_installer.h"
 #include "diag.h"
 #include "notify.h"
 #include "sce_resolve.h"
 #include "websrv.h"
 
-#define BFPILOT_APP_TITLE_ID "P5FE00001"
+#define BFPILOT_APP_TITLE_ID "PSFE50001"
+#define BFPILOT_BAD_RENAME_APP_TITLE_ID "P5FE00001"
 #define BFPILOT_INVALID_APP_TITLE_ID "BFPILOT01"
 #define BFPILOT_PRE_RENAME_APP_TITLE_ID "BFPL00001"
 #define BFPILOT_LEGACY_APP_TITLE_ID "BSFM00001"
@@ -51,6 +54,8 @@ typedef int (*app_install_title_dir_fn)(const char *, const char *, void *);
 
 int sceAppInstUtilInitialize(void);
 int sceAppInstUtilAppInstallAll(void *);
+int sceAppInstUtilAppInstallTitleDir(const char *, const char *, void *);
+int sceAppInstUtilAppUnInstall(const char *);
 
 typedef struct appinst_api {
   app_install_title_dir_fn    install_title_dir;
@@ -124,9 +129,8 @@ resolve_appinst(appinst_api_t *api) {
   bfpilot_log("launcher resolve AppInstallTitleDir NID %s rc=0x%08x",
               api->install_title_dir ? "ok" : "missing", rc);
 
-  g_launcher_diag.uninstall_resolved = 0;
-  g_launcher_diag.uninstall_rc = BFPILOT_DIAG_SKIPPED;
-  bfpilot_log("launcher uninstall skipped for compatibility");
+  g_launcher_diag.uninstall_resolved = 1;
+  bfpilot_log("launcher AppUnInstall uses linked SDK stub");
 
   g_launcher_diag.install_all_resolved = 1;
   bfpilot_log("launcher AppInstallAll uses linked SDK stub");
@@ -152,8 +156,16 @@ probe_dir_writable(const char *dir) {
 
 static int
 install_app(const appinst_api_t *api, const char *title_id, const char *dir) {
+  int err = sceAppInstUtilAppInstallTitleDir(title_id, dir, NULL);
+  g_launcher_diag.install_title_rc = err;
+  g_launcher_diag.launcher_install_rc = err;
+  publish_launcher_diag();
+  if(err == 0) return 0;
+  bfpilot_log("launcher install direct AppInstallTitleDir failed rc=0x%08x",
+              err);
+
   if(api->install_title_dir) {
-    int err = api->install_title_dir(title_id, dir, NULL);
+    err = api->install_title_dir(title_id, dir, NULL);
     g_launcher_diag.install_title_rc = err;
     g_launcher_diag.launcher_install_rc = err;
     publish_launcher_diag();
@@ -165,12 +177,36 @@ install_app(const appinst_api_t *api, const char *title_id, const char *dir) {
     bfpilot_log("launcher install AppInstallTitleDir not resolved");
   }
 
-  int err = sceAppInstUtilAppInstallAll(NULL);
+  err = sceAppInstUtilAppInstallAll(NULL);
   g_launcher_diag.install_all_rc = err;
   g_launcher_diag.launcher_install_rc = err;
   publish_launcher_diag();
   bfpilot_log("launcher install AppInstallAll rc=0x%08x", err);
   return err;
+}
+
+
+static int
+uninstall_launcher_title(const char *title_id, const char *label) {
+  int err = sceAppInstUtilAppUnInstall(title_id);
+  g_launcher_diag.uninstall_rc = err;
+  publish_launcher_diag();
+  bfpilot_log("launcher install remove %s rc=0x%08x", label, err);
+  return err;
+}
+
+
+static int remove_tree(const char *path);
+
+
+static void
+remove_launcher_dir(const char *title_id, const char *label) {
+  char dir[256];
+  snprintf(dir, sizeof(dir), BFPILOT_APP_ROOT "/%s", title_id);
+  if(remove_tree(dir) != 0) {
+    bfpilot_log("launcher install warning failed removing %s dir %s errno=%d",
+                label, dir, errno);
+  }
 }
 
 
@@ -265,6 +301,7 @@ bfpilot_install_app_if_needed(void) {
   char sce_sys_dir[256];
   char param_path[256];
   char icon_path[256];
+  char msg[128];
   struct stat st;
 
   reset_launcher_diag();
@@ -305,24 +342,33 @@ bfpilot_install_app_if_needed(void) {
     bfpilot_log("launcher install sceAppInstUtilInitialize failed rc=0x%08x",
                 err);
     set_launcher_final("failed_nonfatal", err);
+    snprintf(msg, sizeof(msg), "AppInst init failed 0x%08x", err);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
-  g_launcher_diag.uninstall_rc = BFPILOT_DIAG_SKIPPED;
-  publish_launcher_diag();
-  bfpilot_log("launcher install AppUnInstall skipped");
+  uninstall_launcher_title(BFPILOT_APP_TITLE_ID, "File Explorer tile");
+  uninstall_launcher_title(BFPILOT_BAD_RENAME_APP_TITLE_ID,
+                           "invalid P5FE tile");
+  uninstall_launcher_title(BFPILOT_INVALID_APP_TITLE_ID,
+                           "invalid BFpilot tile");
+  uninstall_launcher_title(BFPILOT_PRE_RENAME_APP_TITLE_ID,
+                           "previous BFpilot tile");
+  uninstall_launcher_title(BFPILOT_LEGACY_APP_TITLE_ID,
+                           "BS5FileManager tile");
+  uninstall_launcher_title(BFPILOT_OLD_LEGACY_APP_TITLE_ID,
+                           "old legacy tile");
 
-  char invalid_dir[256];
-  snprintf(invalid_dir, sizeof(invalid_dir), BFPILOT_APP_ROOT "/%s",
-           BFPILOT_INVALID_APP_TITLE_ID);
-  if(remove_tree(invalid_dir) != 0) {
-    bfpilot_log("launcher install warning failed removing %s errno=%d",
-                invalid_dir, errno);
-  }
+  remove_launcher_dir(BFPILOT_BAD_RENAME_APP_TITLE_ID, "invalid P5FE tile");
+  remove_launcher_dir(BFPILOT_INVALID_APP_TITLE_ID, "invalid BFpilot tile");
+  remove_launcher_dir(BFPILOT_PRE_RENAME_APP_TITLE_ID,
+                      "previous BFpilot tile");
 
   if(mkdir_if_needed(app_dir) != 0 || mkdir_if_needed(sce_sys_dir) != 0) {
     bfpilot_log("launcher install mkdir failed errno=%d", errno);
     set_launcher_final("failed_nonfatal", -errno);
+    snprintf(msg, sizeof(msg), "mkdir failed errno %d", errno);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
@@ -330,6 +376,7 @@ bfpilot_install_app_if_needed(void) {
     bfpilot_log("launcher install failed writing %s errno=%d",
                 param_path, errno);
     set_launcher_final("failed_nonfatal", -errno);
+    bfpilot_notify("File Explorer app failed", "could not write param.json");
     return -1;
   }
 
@@ -337,6 +384,7 @@ bfpilot_install_app_if_needed(void) {
     bfpilot_log("launcher install failed writing %s errno=%d",
                 icon_path, errno);
     set_launcher_final("failed_nonfatal", -errno);
+    bfpilot_notify("File Explorer app failed", "could not write icon0.png");
     return -1;
   }
 
@@ -344,6 +392,8 @@ bfpilot_install_app_if_needed(void) {
   if(err) {
     bfpilot_log("launcher install install_app failed rc=0x%08x", err);
     set_launcher_final("failed_nonfatal", err);
+    snprintf(msg, sizeof(msg), "register PSFE50001 failed 0x%08x", err);
+    bfpilot_notify("File Explorer app failed", msg);
     return -1;
   }
 
@@ -358,6 +408,6 @@ bfpilot_install_app_if_needed(void) {
 
   set_launcher_final("installed", 0);
   bfpilot_notify("File Explorer app ready",
-                 "Tile P5FE00001 opens http://127.0.0.1:5905/");
+                 "Tile PSFE50001 opens http://127.0.0.1:5905/");
   return 1;
 }

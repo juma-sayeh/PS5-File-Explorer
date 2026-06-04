@@ -36,11 +36,8 @@
 #define BFPILOT_RELOAD_TOKEN "bs5fm-local-reload"
 
 #if BFPILOT_ENABLE_LAUNCHER
-typedef int (*sce_netctl_init_fn)(void);
-typedef int (*sce_user_service_initialize_fn)(void *);
-
-#define BFPILOT_NETCTL_MODULE "libSceNetCtl.sprx"
-#define BFPILOT_USER_SERVICE_MODULE "libSceUserService.sprx"
+int sceNetCtlInit(void);
+int sceUserServiceInitialize(void *);
 #endif
 
 
@@ -80,36 +77,11 @@ typedef struct ready_state {
 static void
 init_ps5_services(void) {
   int user_prio = 256;
-  int netctl_rc = BFPILOT_DIAG_SKIPPED;
-  int user_service_rc = BFPILOT_DIAG_SKIPPED;
-  sce_netctl_init_fn sce_netctl_init = NULL;
-  sce_user_service_initialize_fn sce_user_service_initialize = NULL;
+  int netctl_rc = sceNetCtlInit();
+  bfpilot_log("sceNetCtlInit rc=0x%08x", netctl_rc);
 
-  int resolve_rc = sce_resolve_symbol(BFPILOT_NETCTL_MODULE,
-                                      "sceNetCtlInit",
-                                      (void **)&sce_netctl_init);
-  bfpilot_log("sce resolve %s:sceNetCtlInit %s rc=0x%08x",
-              BFPILOT_NETCTL_MODULE,
-              sce_netctl_init ? "ok" : "missing", resolve_rc);
-  if(sce_netctl_init) {
-    netctl_rc = sce_netctl_init();
-    bfpilot_log("sceNetCtlInit rc=0x%08x", netctl_rc);
-  } else {
-    bfpilot_log("sceNetCtlInit rc=skipped");
-  }
-
-  resolve_rc = sce_resolve_symbol(BFPILOT_USER_SERVICE_MODULE,
-                                  "sceUserServiceInitialize",
-                                  (void **)&sce_user_service_initialize);
-  bfpilot_log("sce resolve %s:sceUserServiceInitialize %s rc=0x%08x",
-              BFPILOT_USER_SERVICE_MODULE,
-              sce_user_service_initialize ? "ok" : "missing", resolve_rc);
-  if(sce_user_service_initialize) {
-    user_service_rc = sce_user_service_initialize(&user_prio);
-    bfpilot_log("sceUserServiceInitialize rc=0x%08x", user_service_rc);
-  } else {
-    bfpilot_log("sceUserServiceInitialize rc=skipped");
-  }
+  int user_service_rc = sceUserServiceInitialize(&user_prio);
+  bfpilot_log("sceUserServiceInitialize rc=0x%08x", user_service_rc);
 
   bfpilot_diag_set_service_rcs(netctl_rc, user_service_rc);
 }

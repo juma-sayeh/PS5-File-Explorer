@@ -2,6 +2,7 @@
  * File Explorer - PS5 notification helpers.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,9 @@
 
 #include "diag.h"
 #include "notify.h"
+#include "version.h"
+
+#define SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM 0xFE
 
 typedef struct notify_request {
   char unused[45];
@@ -16,6 +20,9 @@ typedef struct notify_request {
 } notify_request_t;
 
 
+#if BFPILOT_ENABLE_LAUNCHER
+int sceNotificationSend(int userId, bool isLogged, const char *payload);
+#endif
 int sceKernelSendNotificationRequest(int, notify_request_t *req, size_t size,
                                      int flags) __attribute__((weak));
 
@@ -38,6 +45,48 @@ notify_debug(const char *message, const char *submessage) {
 }
 
 
+static int
+notify_toast(const char *message, const char *submessage) {
+#if BFPILOT_ENABLE_LAUNCHER
+  char payload[4096];
+
+  snprintf(payload, sizeof(payload),
+           "{"
+           "\"rawData\":{"
+           "\"viewTemplateType\":\"InteractiveToastTemplateB\","
+           "\"channelType\":\"Downloads\","
+           "\"useCaseId\":\"IDC\","
+           "\"toastOverwriteType\":\"No\","
+           "\"isImmediate\":true,"
+           "\"priority\":100,"
+           "\"viewData\":{"
+           "\"icon\":{\"type\":\"Predefined\",\"parameters\":{\"icon\":\"download\"}},"
+           "\"message\":{\"body\":\"%s\"},"
+           "\"subMessage\":{\"body\":\"%s\"}"
+           "},"
+           "\"platformViews\":{"
+           "\"previewDisabled\":{"
+           "\"viewData\":{"
+           "\"icon\":{\"type\":\"Predefined\",\"parameters\":{\"icon\":\"download\"}},"
+           "\"message\":{\"body\":\"%s\"}"
+           "}"
+           "}"
+           "}"
+           "},"
+           "\"localNotificationId\":\"5905\""
+           "}",
+           message, submessage, message);
+
+  return sceNotificationSend(SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM, true,
+                             payload);
+#else
+  (void)message;
+  (void)submessage;
+  return BFPILOT_DIAG_SKIPPED;
+#endif
+}
+
+
 int
 bfpilot_notify_send(const char *message, const char *submessage) {
   const char *msg = message ? message : "File Explorer";
@@ -48,13 +97,18 @@ bfpilot_notify_send(const char *message, const char *submessage) {
                   !strcasecmp(disabled, "yes"))) {
     return BFPILOT_DIAG_SKIPPED;
   }
-  return notify_debug(msg, sub);
+
+  int toast_rc = notify_toast(msg, sub);
+  if(toast_rc == 0) return 0;
+
+  int debug_rc = notify_debug(msg, sub);
+  return toast_rc != BFPILOT_DIAG_SKIPPED ? toast_rc : debug_rc;
 }
 
 
 int
 bfpilot_notify_test(void) {
-  return bfpilot_notify_send("File Explorer diagnostics", "notification test");
+  return notify_toast("File Explorer starting", "Preparing PS5 web UI");
 }
 
 

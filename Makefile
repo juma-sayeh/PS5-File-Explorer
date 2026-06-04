@@ -27,7 +27,7 @@ export LLVM_BINDIR
 export LLVM_CONFIG
 
 CORE_BIN := file-explorer-core.elf
-FULL_BIN := file-explorer-full.elf
+FULL_BIN := file-explorer.elf
 
 COMMON_C_SRCS := src/lite_main.c
 COMMON_C_SRCS += src/diag.c
@@ -145,7 +145,9 @@ UNRAR_CXXFLAGS += -Wno-logical-op-parentheses -Wno-switch -Wno-dangling-else
 UNRAR_CXXFLAGS += -Wno-unused-variable -Wno-unused-function
 
 COMMON_LDFLAGS := -Wl,--gc-sections -flto
-FULL_LDLIBS := -lSceAppInstUtil
+FULL_LDLIBS := -lkernel_sys -lSceNotification -lSceIpmi
+FULL_LDLIBS += -lSceAppInstUtil -lSceUserService -lSceSystemService
+FULL_LDLIBS += -lSceNetCtl
 
 CC_CMD := "$(CC)"
 CXX_CMD := "$(CXX)"
@@ -225,7 +227,7 @@ deploy-full: full
 	$(call run,$(DEPLOY_CMD) -h $(PS5_HOST) -p $(PS5_PORT) $(FULL_BIN))
 
 clean:
-	$(call run,rm -rf $(CORE_BIN) $(FULL_BIN) build gen)
+	$(call run,rm -rf $(CORE_BIN) $(FULL_BIN) file-explorer-full.elf build gen)
 
 .SECONDARY: $(GEN_SRCS)
 .PHONY: all core full clean deploy-core deploy-full

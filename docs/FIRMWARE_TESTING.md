@@ -2,7 +2,7 @@
 
 This protocol checks whether File Explorer runs safely across jailbroken PS5 firmwares and loaders. It does not require exploit changes, kernel patching, package loading, or DRM-related features.
 
-Use `file-explorer-core.elf` first on every firmware. Only test `file-explorer-full.elf` after the core server is confirmed working.
+Use `file-explorer-core.elf` first on every firmware. Only test `file-explorer.elf` after the core server is confirmed working.
 
 ## Before Testing
 
@@ -10,7 +10,7 @@ Record these details before each run:
 
 - PS5 firmware version.
 - Exploit and loader name/version.
-- Payload file used: `file-explorer-core.elf` or `file-explorer-full.elf`.
+- Payload file used: `file-explorer-core.elf` or `file-explorer.elf`.
 - PS5 IP address.
 - Sender tool and command used.
 - Whether `/data/FileExplorer/log.txt` and `/data/FileExplorer/crash.log` exist after the run.
@@ -60,7 +60,7 @@ Fail data to collect:
 Purpose: verify notification support is optional and cannot stop the web server.
 
 1. Start from a PS5 state where Stage A passed.
-2. Send `file-explorer-core.elf` again, or start `file-explorer-full.elf` with launcher disabled using `--no-launcher` or `BFPILOT_NO_LAUNCHER=1` if the loader supports arguments/environment.
+2. Send `file-explorer-core.elf` again, or start `file-explorer.elf` with launcher disabled using `--no-launcher` or `BFPILOT_NO_LAUNCHER=1` if the loader supports arguments/environment.
 3. Trigger the File Explorer notification path by starting the payload and watching for the startup notification attempt.
 4. Open `http://PS5_IP:5905/`.
 5. Open `http://PS5_IP:5905/api/diag`.
@@ -85,7 +85,7 @@ Purpose: verify full mode can attempt launcher install/refresh without making la
 
 Only run this stage after Stage A passes on the same firmware and loader.
 
-1. Send `file-explorer-full.elf` to the loader on port `9021`.
+1. Send `file-explorer.elf` to the loader on port `9021`.
 2. Watch for launcher install or refresh messages.
 3. Open `http://PS5_IP:5905/`.
 4. Open `http://PS5_IP:5905/api/status`.
@@ -141,7 +141,7 @@ Purpose: verify reinjecting File Explorer does not kill unrelated payloads or in
 7. While the copy is active, inject `file-explorer-core.elf` again.
 8. Verify the old copy job is not killed by the new injection.
 9. Verify the web server remains reachable after the copy finishes.
-10. Repeat the idle reinjection test once with `file-explorer-full.elf` only after full mode passed Stage C.
+10. Repeat the idle reinjection test once with `file-explorer.elf` only after full mode passed Stage C.
 
 Pass criteria:
 
@@ -162,11 +162,11 @@ Fail data to collect:
 | firmware | exploit/loader | payload used | server starts | file browse | upload | copy | move | delete | launcher install | notes |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 11.60 |  | `file-explorer-core.elf` |  |  |  |  |  |  | N/A |  |
-| 11.60 |  | `file-explorer-full.elf` |  |  |  |  |  |  |  |  |
+| 11.60 |  | `file-explorer.elf` |  |  |  |  |  |  |  |  |
 | 12.70 |  | `file-explorer-core.elf` |  |  |  |  |  |  | N/A |  |
-| 12.70 |  | `file-explorer-full.elf` |  |  |  |  |  |  |  |  |
+| 12.70 |  | `file-explorer.elf` |  |  |  |  |  |  |  |  |
 |  |  | `file-explorer-core.elf` |  |  |  |  |  |  | N/A |  |
-|  |  | `file-explorer-full.elf` |  |  |  |  |  |  |  |  |
+|  |  | `file-explorer.elf` |  |  |  |  |  |  |  |  |
 
 Use `yes`, `no`, or `partial` for result columns. Put exact error codes, HTTP status codes, and log checkpoints in `notes`.
 
