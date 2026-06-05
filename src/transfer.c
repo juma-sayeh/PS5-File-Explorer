@@ -35,7 +35,6 @@
 #define UPLOAD_CHUNK_MAX (16 * 1024 * 1024)
 #define OP_LOG_DIR "/data/FileExplorer/logs"
 #define OP_LOG_READ_MAX (512 * 1024)
-#define SHADOWMOUNT_AUTOTUNE_FILE "/data/shadowmount/autotune.ini"
 #define ACTIVITY_MAX 128
 #define ACTIVITY_LOG_LIMIT_DEFAULT 80
 #define ACTIVITY_LOG_LIMIT_MAX 200
@@ -211,7 +210,9 @@ token_safe(const char *value) {
 static int
 kind_safe(const char *value) {
   if(!value || !*value || strlen(value) >= ACTIVITY_KIND_MAX) return 0;
-  if(strcmp(value, "upload") && strcmp(value, "zip") && strcmp(value, "rar")) {
+  if(strcmp(value, "upload") && strcmp(value, "zip") && strcmp(value, "rar") &&
+     strcmp(value, "compress") && strcmp(value, "decompress") &&
+     strcmp(value, "prepare") && strcmp(value, "patch")) {
     return 0;
   }
   return 1;
@@ -570,124 +571,6 @@ const char *
 path_basename(const char *path) {
   const char *base = strrchr(path ? path : "", '/');
   return base && base[1] ? base + 1 : path;
-}
-
-
-static char *
-trim_ascii_inplace(char *s) {
-  if(!s) return s;
-  while(*s && isspace((unsigned char)*s)) s++;
-  char *end = s + strlen(s);
-  while(end > s && isspace((unsigned char)end[-1])) *--end = 0;
-  return s;
-}
-
-
-static int
-shadowmount_image_filename_safe(const char *name) {
-  if(!name || !*name || strlen(name) >= 512) return 0;
-  for(const unsigned char *p = (const unsigned char *)name; *p; p++) {
-    if(*p < 0x20 || *p == ':' || *p == '/' || *p == '\\') return 0;
-  }
-  return 1;
-}
-
-
-static int
-shadowmount_line_matches_image_sector(const char *line, const char *filename) {
-  char local[1024];
-  char *eq, *key, *value, *sep, *rule_name;
-  if(!line || !filename) return 0;
-  snprintf(local, sizeof(local), "%s", line);
-  key = trim_ascii_inplace(local);
-  if(!*key || *key == '#' || *key == ';') return 0;
-  eq = strchr(key, '=');
-  if(!eq) return 0;
-  *eq = 0;
-  value = trim_ascii_inplace(eq + 1);
-  key = trim_ascii_inplace(key);
-  if(strcasecmp(key, "image_sector")) return 0;
-  sep = strrchr(value, ':');
-  if(!sep) return 0;
-  *sep = 0;
-  rule_name = trim_ascii_inplace(value);
-  return strcasecmp(rule_name, filename) == 0;
-}
-
-
-static int
-shadowmount_remove_image_sector(const char *image_path, char *configured_name,
-                                size_t configured_name_size, int *removed,
-                                char *err, size_t err_size) {
-  const char *base = path_basename(image_path);
-  char temp_path[1024];
-  FILE *in = NULL;
-  FILE *out = NULL;
-  int found = 0;
-  int rc = -1;
-
-  if(configured_name && configured_name_size > 0) configured_name[0] = 0;
-  if(removed) *removed = 0;
-  if(!shadowmount_image_filename_safe(base)) {
-    snprintf(err, err_size, "bad ShadowMount image filename");
-    errno = EINVAL;
-    return -1;
-  }
-  if(configured_name && configured_name_size > 0) {
-    snprintf(configured_name, configured_name_size, "%s", base);
-  }
-  if(snprintf(temp_path, sizeof(temp_path), "%s.tmp",
-              SHADOWMOUNT_AUTOTUNE_FILE) >= (int)sizeof(temp_path)) {
-    snprintf(err, err_size, "ShadowMount autotune path too long");
-    errno = ENAMETOOLONG;
-    return -1;
-  }
-
-  in = fopen(SHADOWMOUNT_AUTOTUNE_FILE, "r");
-  if(!in) {
-    if(errno == ENOENT) return 0;
-    snprintf(err, err_size, "open ShadowMount autotune: %s", strerror(errno));
-    return -1;
-  }
-  out = fopen(temp_path, "w");
-  if(!out) {
-    snprintf(err, err_size, "open ShadowMount autotune temp: %s", strerror(errno));
-    fclose(in);
-    return -1;
-  }
-
-  char line[1024];
-  while(fgets(line, sizeof(line), in)) {
-    if(shadowmount_line_matches_image_sector(line, base)) {
-      found = 1;
-      continue;
-    }
-    if(fputs(line, out) == EOF) {
-      snprintf(err, err_size, "write ShadowMount autotune: %s",
-               strerror(errno));
-      goto done;
-    }
-  }
-
-  if(fclose(out) != 0) {
-    out = NULL;
-    snprintf(err, err_size, "close ShadowMount autotune: %s", strerror(errno));
-    goto done;
-  }
-  out = NULL;
-  if(rename(temp_path, SHADOWMOUNT_AUTOTUNE_FILE) != 0) {
-    snprintf(err, err_size, "replace ShadowMount autotune: %s",
-             strerror(errno));
-    goto done;
-  }
-  if(removed) *removed = found;
-  rc = 0;
-
-done:
-  if(in) fclose(in);
-  if(out) fclose(out);
-  if(rc != 0) unlink(temp_path);
-  return rc;
 }
 
 
@@ -2006,6 +1889,7 @@ typedef struct app_compress_op {
   int  workers;
   int  format;
   int  delete_policy;
+  int  pfsc_mode;
 } app_compress_op_t;
 
 typedef struct app_decompress_op {
@@ -2022,6 +1906,11 @@ typedef struct app_prepare_op {
 static const char *
 app_compress_format_name(int format) {
   return format == PFS_COMPRESS_FORMAT_EXFAT ? "exfat" : "pfs";
+}
+
+static const char *
+app_pfsc_mode_name(int mode) {
+  return mode == PFS_COMPRESS_PFSC_RAW ? "raw" : "zlib";
 }
 
 static const char *
@@ -2047,32 +1936,53 @@ app_compress_worker(void *arg) {
   char extra[1024] = {0};
   snprintf(extra, sizeof(extra),
            "Format: %s\n"
+           "PFSCMode: %s\n"
            "DeletePolicy: %s\n",
            app_compress_format_name(a->format),
+           app_pfsc_mode_name(a->pfsc_mode),
            app_delete_policy_name(a->delete_policy));
   if(a->delete_policy == PFS_DELETE_STREAM) {
     snprintf(extra, sizeof(extra),
              "Format: %s\n"
+             "PFSCMode: %s\n"
              "DeletePolicy: %s\n"
              "ConvertMode: destructive-stream\n"
              "ConvertWarning: no rollback\n",
              app_compress_format_name(a->format),
+             app_pfsc_mode_name(a->pfsc_mode),
              app_delete_policy_name(a->delete_policy));
   } else if(a->delete_policy == PFS_DELETE_AFTER) {
     size_t used = strlen(extra);
     snprintf(extra + used, sizeof(extra) - used,
              "ConvertMode: delete-after-success\n");
   }
-  int rc = pfs_compress_app_to_ffpfsc_opts(a->path, a->overwrite, a->workers,
-                                           a->format, a->delete_policy,
-                                           &info, err, sizeof(err));
+  if(a->format == PFS_COMPRESS_FORMAT_EXFAT) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "ShadowMountImageSector: 65536\n"
+             "ShadowMountNestedSector: 65536\n");
+  }
+  if(a->pfsc_mode == PFS_COMPRESS_PFSC_RAW) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "PFSCModeWarning: raw diagnostic mode; do not use for mount validation\n");
+  }
+  int rc = pfs_compress_app_to_ffpfsc_opts_mode(
+      a->path, a->overwrite, a->workers, a->format, a->delete_policy,
+      a->pfsc_mode, &info, err, sizeof(err));
   if(rc == 0) {
     job_set_target(info.output_path);
     size_t used = strlen(extra);
     snprintf(extra + used, sizeof(extra) - used,
              "Output: %s\n"
-             "NestedImage: %s\n",
-             info.output_path, info.nested_name);
+             "NestedImage: %s\n"
+             "NestedLogicalBytes: %llu\n"
+             "PFSCStoredBytes: %llu\n"
+             "PFSCStoredOverLogical: %s\n",
+             info.output_path, info.nested_name,
+             (unsigned long long)info.nested_size,
+             (unsigned long long)info.stored_size,
+             info.stored_size > info.nested_size ? "yes" : "no");
   }
   job_end_with_extra(rc, rc == 0 ? NULL : (err[0] ? err : "compress failed"),
                      extra[0] ? extra : NULL);
@@ -2111,47 +2021,6 @@ app_decompress_worker(void *arg) {
              "NestedType: %s\n",
              info.output_path, info.nested_name,
              app_nested_type_name(info.nested_type));
-  }
-  if(rc == 0 && a->delete_policy != PFS_DELETE_KEEP) {
-    char sm_name[512] = {0};
-    char sm_err[256] = {0};
-    int removed = 0;
-    if(shadowmount_remove_image_sector(info.source_path, sm_name,
-          sizeof(sm_name), &removed, sm_err, sizeof(sm_err)) != 0) {
-      snprintf(err, sizeof(err), "decompressed, but ShadowMountPlus cleanup failed: %s",
-               sm_err[0] ? sm_err : strerror(errno));
-      rc = -1;
-    } else {
-      size_t used = strlen(extra);
-      snprintf(extra + used, sizeof(extra) - used,
-               "ShadowMountAutotune: %s\n"
-               "ShadowMountImage: %s\n"
-               "ShadowMountAction: removed\n"
-               "ShadowMountRemoved: %s\n",
-               SHADOWMOUNT_AUTOTUNE_FILE, sm_name,
-               removed ? "yes" : "no");
-      job_set_current(removed ? "ShadowMountPlus entry removed" :
-                                "ShadowMountPlus entry already clean");
-    }
-    if(rc == 0 && info.nested_type == PFS_NESTED_EXFAT &&
-       info.nested_name[0]) {
-      char nested_sm_name[512] = {0};
-      int nested_removed = 0;
-      if(shadowmount_remove_image_sector(info.nested_name, nested_sm_name,
-            sizeof(nested_sm_name), &nested_removed, sm_err,
-            sizeof(sm_err)) != 0) {
-        snprintf(err, sizeof(err), "decompressed, but nested exFAT ShadowMountPlus cleanup failed: %s",
-                 sm_err[0] ? sm_err : strerror(errno));
-        rc = -1;
-      } else {
-        size_t used = strlen(extra);
-        snprintf(extra + used, sizeof(extra) - used,
-                 "ShadowMountNestedImage: %s\n"
-                 "ShadowMountNestedAction: removed\n"
-                 "ShadowMountNestedRemoved: %s\n",
-                 nested_sm_name, nested_removed ? "yes" : "no");
-      }
-    }
   }
   job_end_with_extra(rc, rc == 0 ? NULL : (err[0] ? err : "decompress failed"),
                      extra[0] ? extra : NULL);
@@ -2251,6 +2120,7 @@ app_prepare_handler(const http_request_t *req) {
   char inline_arg[16] = {0};
   char err[256] = {0};
   char log_name[256] = {0};
+  activity_request_ctx_t activity = {0};
   archive_app_prepare_info_t info;
   int inline_apply = 0;
 
@@ -2271,6 +2141,11 @@ app_prepare_handler(const http_request_t *req) {
   if(websrv_get_query_arg(req, "inline", inline_arg, sizeof(inline_arg)) &&
      strcmp(inline_arg, "0") != 0) {
     inline_apply = 1;
+  }
+  const char *job_verb = info.patch_mode ? "patch" : "prepare";
+  if(activity_validate_lease(req, job_verb, &activity, err,
+                             sizeof(err)) != 0) {
+    return serve_error(req, 409, err[0] ? err : "bad activity lease");
   }
   if(info.prepared) {
     json_buf_t b = {0};
@@ -2296,7 +2171,6 @@ app_prepare_handler(const http_request_t *req) {
     }
     return serve_owned(req, 200, b.data, b.len);
   }
-  const char *job_verb = info.patch_mode ? "patch" : "prepare";
   if(!job_begin(job_verb)) {
     return serve_error(req, 409, "job already running");
   }
@@ -2852,12 +2726,15 @@ app_checksum_handler(const http_request_t *req) {
 static int
 app_compress_handler(const http_request_t *req) {
   char path[1024], overwrite_arg[32], convert_arg[32];
-  char format_arg[32], delete_arg[32];
+  char format_arg[32], delete_arg[32], pfsc_arg[32];
   char err[256] = {0};
+  char log_name[256] = {0};
+  activity_request_ctx_t activity = {0};
   pfs_app_info_t info;
   int overwrite = 0;
   int convert = 0;
   int format = PFS_COMPRESS_FORMAT_PFS;
+  int pfsc_mode = PFS_COMPRESS_PFSC_ZLIB;
   int delete_policy = PFS_DELETE_KEEP;
   int workers = PFS_COMPRESS_DEFAULT_WORKERS;
 
@@ -2865,6 +2742,10 @@ app_compress_handler(const http_request_t *req) {
      !path_is_safe(path)) {
     operation_log_write_simple("compress", "-", -1, "bad path", 0, 0);
     return serve_error(req, 400, "bad path");
+  }
+  if(activity_validate_lease(req, "compress", &activity, err,
+                             sizeof(err)) != 0) {
+    return serve_error(req, 409, err[0] ? err : "bad activity lease");
   }
   if(websrv_get_query_arg(req, "overwrite", overwrite_arg,
                           sizeof(overwrite_arg)) &&
@@ -2887,6 +2768,18 @@ app_compress_handler(const http_request_t *req) {
       return serve_error(req, 400, "bad compression format");
     }
   }
+  if(websrv_get_query_arg(req, "pfsc", pfsc_arg, sizeof(pfsc_arg))) {
+    if(!strcasecmp(pfsc_arg, "zlib") || !strcasecmp(pfsc_arg, "compressed")) {
+      pfsc_mode = PFS_COMPRESS_PFSC_ZLIB;
+    } else if(!strcasecmp(pfsc_arg, "raw") ||
+              !strcasecmp(pfsc_arg, "nocompress")) {
+      pfsc_mode = PFS_COMPRESS_PFSC_RAW;
+    } else {
+      operation_log_write_simple("compress", path, -1,
+                                 "bad PFSC mode", 0, 0);
+      return serve_error(req, 400, "bad PFSC mode");
+    }
+  }
   if(websrv_get_query_arg(req, "delete", delete_arg, sizeof(delete_arg))) {
     if(!strcasecmp(delete_arg, "keep")) {
       delete_policy = PFS_DELETE_KEEP;
@@ -2903,6 +2796,14 @@ app_compress_handler(const http_request_t *req) {
   if(convert) {
     format = PFS_COMPRESS_FORMAT_PFS;
     delete_policy = PFS_DELETE_STREAM;
+  }
+  if(format == PFS_COMPRESS_FORMAT_EXFAT &&
+     pfsc_mode == PFS_COMPRESS_PFSC_RAW) {
+    operation_log_write_simple("compress", path, -1,
+                               "raw PFSC exFAT images are diagnostic-only and not mountable; use zlib PFSC",
+                               0, 0);
+    return serve_error(req, 400,
+                       "raw PFSC exFAT images are diagnostic-only and not mountable; use zlib PFSC");
   }
   if(pfs_app_probe(path, &info, err, sizeof(err)) != 0) {
     operation_log_write_simple("compress", path, -1,
@@ -2923,6 +2824,7 @@ app_compress_handler(const http_request_t *req) {
   if(!job_begin("compress")) {
     return serve_error(req, 409, "job already running");
   }
+  job_log_name(log_name, sizeof(log_name));
 
   app_compress_op_t *a = calloc(1, sizeof(*a));
   if(!a) {
@@ -2934,6 +2836,7 @@ app_compress_handler(const http_request_t *req) {
   a->workers = workers;
   a->format = format;
   a->delete_policy = delete_policy;
+  a->pfsc_mode = pfsc_mode;
 
   pthread_t t;
   pthread_attr_t at;
@@ -2962,10 +2865,14 @@ app_compress_handler(const http_request_t *req) {
 	     json_string(&b, info.output_path) != 0 ||
 	     json_append(&b, ",\"format\":") != 0 ||
 	     json_string(&b, app_compress_format_name(format)) != 0 ||
+	     json_append(&b, ",\"pfscMode\":") != 0 ||
+	     json_string(&b, app_pfsc_mode_name(pfsc_mode)) != 0 ||
 	     json_append(&b, ",\"deletePolicy\":") != 0 ||
 	     json_string(&b, app_delete_policy_name(delete_policy)) != 0 ||
 	     json_append(&b, ",\"nestedName\":") != 0 ||
 	     json_string(&b, nested_name) != 0 ||
+	     json_append(&b, ",\"logName\":") != 0 ||
+	     json_string(&b, log_name) != 0 ||
 	     json_appendf(&b, ",\"convert\":%s", convert ? "true" : "false") != 0 ||
 	     json_append(&b, "}") != 0) {
     free(b.data);
@@ -2979,6 +2886,8 @@ static int
 app_decompress_handler(const http_request_t *req) {
   char path[1024], overwrite_arg[32], convert_arg[32], delete_arg[32];
   char err[256] = {0};
+  char log_name[256] = {0};
+  activity_request_ctx_t activity = {0};
   pfs_decompress_info_t info;
   int overwrite = 0;
   int convert = 0;
@@ -2989,6 +2898,10 @@ app_decompress_handler(const http_request_t *req) {
      !path_is_safe(path)) {
     operation_log_write_simple("decompress", "-", -1, "bad path", 0, 0);
     return serve_error(req, 400, "bad path");
+  }
+  if(activity_validate_lease(req, "decompress", &activity, err,
+                             sizeof(err)) != 0) {
+    return serve_error(req, 409, err[0] ? err : "bad activity lease");
   }
   if(websrv_get_query_arg(req, "overwrite", overwrite_arg,
                           sizeof(overwrite_arg)) &&
@@ -3033,6 +2946,7 @@ app_decompress_handler(const http_request_t *req) {
   if(!job_begin("decompress")) {
     return serve_error(req, 409, "job already running");
   }
+  job_log_name(log_name, sizeof(log_name));
 
   app_decompress_op_t *a = calloc(1, sizeof(*a));
   if(!a) {
@@ -3067,6 +2981,8 @@ app_decompress_handler(const http_request_t *req) {
 	     json_string(&b, app_nested_type_name(info.nested_type)) != 0 ||
 	     json_append(&b, ",\"nestedName\":") != 0 ||
 	     json_string(&b, info.nested_name) != 0 ||
+	     json_append(&b, ",\"logName\":") != 0 ||
+	     json_string(&b, log_name) != 0 ||
 	     json_appendf(&b, ",\"convert\":%s", convert ? "true" : "false") != 0 ||
 	     json_append(&b, "}") != 0) {
     free(b.data);

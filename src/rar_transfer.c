@@ -485,6 +485,9 @@ extract_local_rar(const http_request_t *req, const char *archive_path,
                          err, sizeof(err)) != 0) {
     rc = -1;
   }
+  if(rc == 0) {
+    job_set_target(final_base);
+  }
 
 done:
   if(stage[0]) rar_delete_tree(stage);

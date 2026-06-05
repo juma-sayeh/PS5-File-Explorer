@@ -5,13 +5,17 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct pfs_app_info {
   char title_id[64];
   char source_path[1024];
   char output_path[1024];
   char nested_name[256];
+  uint64_t nested_size;
+  uint64_t stored_size;
   int  format;
+  int  pfsc_mode;
   int  delete_policy;
   int  output_exists;
 } pfs_app_info_t;
@@ -27,6 +31,10 @@ typedef struct pfs_decompress_info {
 
 #define PFS_COMPRESS_FORMAT_PFS   0
 #define PFS_COMPRESS_FORMAT_EXFAT 1
+
+/* Temporary diagnostic mode for isolating PS5 PFSC inflate issues. */
+#define PFS_COMPRESS_PFSC_ZLIB 0
+#define PFS_COMPRESS_PFSC_RAW  1
 
 #define PFS_DELETE_KEEP   0
 #define PFS_DELETE_AFTER  1
@@ -56,6 +64,12 @@ int pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
                                     int delete_policy,
                                     pfs_app_info_t *info,
                                     char *err, size_t err_size);
+
+int pfs_compress_app_to_ffpfsc_opts_mode(const char *path, int overwrite,
+                                         int workers, int format,
+                                         int delete_policy, int pfsc_mode,
+                                         pfs_app_info_t *info,
+                                         char *err, size_t err_size);
 
 int pfs_decompress_probe(const char *path, pfs_decompress_info_t *info,
                          char *err, size_t err_size);

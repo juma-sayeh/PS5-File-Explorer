@@ -2276,6 +2276,7 @@ pfsc_free_slots(pfsc_slot_t *slots, int slot_count) {
 static int
 compress_nested_to_pfsc(int fd, uint64_t file_start, pfs_layout_t *nested,
                         int requested_workers, int delete_stream,
+                        int pfsc_mode,
                         const char *nested_name,
                         const char *source_root, int *delete_started,
                         uint64_t *stored_size,
@@ -2296,6 +2297,7 @@ compress_nested_to_pfsc(int fd, uint64_t file_start, pfs_layout_t *nested,
   int rc = -1;
   uint64_t data_pos = header_size;
   size_t next_delete_file = 0;
+  int force_all_raw = pfsc_mode == PFS_COMPRESS_PFSC_RAW;
   mz_uint flags = tdefl_create_comp_flags_from_zip_params(PFSC_ZLIB_LEVEL, 15,
                                                           MZ_DEFAULT_STRATEGY);
 
@@ -2360,7 +2362,8 @@ compress_nested_to_pfsc(int fd, uint64_t file_start, pfs_layout_t *nested,
                block_count > (uint64_t)INT_MAX ? INT_MAX : (int)block_count);
   atomic_store(&g_job.done_files, 0);
   char label[320];
-  snprintf(label, sizeof(label), "Compressing %s",
+  snprintf(label, sizeof(label), "%s %s",
+           force_all_raw ? "Packing" : "Compressing",
            nested_name && nested_name[0] ? nested_name : "nested image");
   job_set_current(label);
 
@@ -2408,6 +2411,7 @@ compress_nested_to_pfsc(int fd, uint64_t file_start, pfs_layout_t *nested,
         goto done;
       }
       slot->force_raw =
+          force_all_raw ||
           layout_block_overlaps_executable_file(nested,
                                                 next_read * PFS_BLOCK_SIZE);
       pthread_mutex_lock(&pool.lock);
@@ -2750,11 +2754,11 @@ pfs_app_probe(const char *path, pfs_app_info_t *info,
 }
 
 int
-pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
-                                int workers, int format,
-                                int delete_policy,
-                                pfs_app_info_t *info,
-                                char *err, size_t err_size) {
+pfs_compress_app_to_ffpfsc_opts_mode(const char *path, int overwrite,
+                                     int workers, int format,
+                                     int delete_policy, int pfsc_mode,
+                                     pfs_app_info_t *info,
+                                     char *err, size_t err_size) {
   pfs_app_info_t local_info;
   pfs_layout_t nested = {0};
   char tmp_path[1024];
@@ -2772,6 +2776,19 @@ pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
     errno = EINVAL;
     return -1;
   }
+  if(pfsc_mode != PFS_COMPRESS_PFSC_ZLIB &&
+     pfsc_mode != PFS_COMPRESS_PFSC_RAW) {
+    set_err(err, err_size, "unsupported PFSC mode");
+    errno = EINVAL;
+    return -1;
+  }
+  if(format == PFS_COMPRESS_FORMAT_EXFAT &&
+     pfsc_mode == PFS_COMPRESS_PFSC_RAW) {
+    set_err(err, err_size,
+            "raw PFSC exFAT images are diagnostic-only and not mountable; use zlib PFSC");
+    errno = EINVAL;
+    return -1;
+  }
   if(delete_policy != PFS_DELETE_KEEP &&
      delete_policy != PFS_DELETE_AFTER &&
      delete_policy != PFS_DELETE_STREAM) {
@@ -2781,6 +2798,7 @@ pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
   }
   if(pfs_app_probe(path, info, err, err_size) != 0) return -1;
   info->format = format;
+  info->pfsc_mode = pfsc_mode;
   info->delete_policy = delete_policy;
   snprintf(info->nested_name, sizeof(info->nested_name), "%s",
            format == PFS_COMPRESS_FORMAT_EXFAT ? info->title_id : "pfs_image.dat");
@@ -2830,12 +2848,14 @@ pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
   }
 
   if(compress_nested_to_pfsc(fd, outer_file_start, &nested, worker_count,
-                             delete_policy == PFS_DELETE_STREAM,
+                             delete_policy == PFS_DELETE_STREAM, pfsc_mode,
                              info->nested_name, info->source_path,
                              &delete_started, &stored_size,
                              err, err_size) != 0) {
     goto done;
   }
+  info->nested_size = nested.image_size;
+  info->stored_size = stored_size;
 
   if(job_cancelled()) {
     set_err(err, err_size, "cancelled");
@@ -2880,6 +2900,18 @@ done:
   }
   layout_free(&nested);
   return rc;
+}
+
+int
+pfs_compress_app_to_ffpfsc_opts(const char *path, int overwrite,
+                                int workers, int format,
+                                int delete_policy,
+                                pfs_app_info_t *info,
+                                char *err, size_t err_size) {
+  return pfs_compress_app_to_ffpfsc_opts_mode(path, overwrite, workers, format,
+                                             delete_policy,
+                                             PFS_COMPRESS_PFSC_ZLIB,
+                                             info, err, err_size);
 }
 
 int

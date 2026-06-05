@@ -31,6 +31,7 @@
 
     html,
     body {
+      height: 100%;
       min-height: 100%;
       margin: 0;
       background: var(--paper);
@@ -41,7 +42,9 @@
 
     body {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      min-height: 100vh;
+      overflow: hidden;
     }
 
     button,
@@ -93,60 +96,23 @@
       font-weight: 700;
     }
 
-    .top {
-      border-bottom: 1px solid var(--line);
-      background: var(--panel);
-    }
-
-    .top-inner {
-      width: min(1500px, 100%);
-      margin: 0 auto;
-      padding: 10px 14px;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .brand {
-      width: 46px;
-      height: 46px;
-      display: block;
-      border-radius: 8px;
-      object-fit: cover;
-      box-shadow: 0 0 0 1px var(--line), 0 6px 16px rgba(52, 211, 153, 0.16);
-    }
-
-    .title {
-      min-width: 0;
-    }
-
-    .title strong {
-      display: block;
-      font-size: 18px;
-    }
-
-    .title span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
     .status {
-      min-height: 30px;
+      min-height: 18px;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 5px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 999px;
       background: var(--soft);
-      padding: 0 10px;
+      padding: 0 7px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 10px;
+      line-height: 1;
     }
 
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 999px;
       background: #566575;
     }
@@ -156,33 +122,35 @@
     }
 
     .shell {
-      width: min(1500px, 100%);
-      margin: 0 auto;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: 372px minmax(0, 1fr) 300px;
-      gap: 12px;
+      width: 100%;
+      height: 100%;
       min-height: 0;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr) 292px;
+      gap: 0;
     }
 
     .rail,
     .browser,
-    .target,
-    .job {
-      border: 1px solid var(--line);
-      border-radius: 8px;
+    .target {
+      border: 0;
+      border-radius: 0;
       background: var(--panel);
-      box-shadow: 0 8px 22px var(--shadow);
+      box-shadow: none;
       min-width: 0;
+      min-height: 0;
     }
 
     .rail {
-      padding: 10px;
-      align-self: start;
+      height: 100%;
+      padding: 8px;
+      border-right: 1px solid var(--line);
+      align-self: stretch;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
-      gap: 10px;
-      max-height: calc(100vh - 108px);
+      gap: 8px;
       overflow: hidden;
     }
 
@@ -239,9 +207,11 @@
     }
 
     .browser {
-      min-height: 650px;
+      height: 100%;
+      min-height: 0;
+      border-right: 1px solid var(--line);
       display: grid;
-      grid-template-rows: auto auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
       overflow: hidden;
     }
 
@@ -249,7 +219,7 @@
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto auto;
       gap: 8px;
-      padding: 10px;
+      padding: 8px 10px;
       border-bottom: 1px solid var(--line);
       background: var(--soft);
     }
@@ -270,7 +240,7 @@
       align-items: center;
       gap: 8px;
       overflow-x: auto;
-      padding: 9px 10px;
+      padding: 7px 10px;
       border-bottom: 1px solid var(--line);
     }
 
@@ -517,10 +487,10 @@
     }
 
     .row-menu {
-      position: absolute;
-      right: 0;
-      top: 34px;
-      z-index: 5;
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 30;
       width: max-content;
       min-width: 170px;
       max-width: calc(100vw - 24px);
@@ -531,6 +501,7 @@
       border-radius: 8px;
       background: var(--panel-2);
       box-shadow: 0 12px 26px var(--shadow);
+      overflow-y: auto;
     }
 
     .row-menu.open {
@@ -605,9 +576,6 @@
     }
 
     .toolbar-menu {
-      position: fixed;
-      right: auto;
-      top: 36px;
       z-index: 20;
     }
 
@@ -629,10 +597,14 @@
     }
 
     .target {
-      align-self: start;
-      padding: 12px;
+      --target-pad: 10px;
+      height: 100%;
+      align-self: stretch;
+      padding: var(--target-pad);
       display: grid;
+      grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
       gap: 10px;
+      overflow: hidden;
     }
 
     .target h2 {
@@ -657,19 +629,23 @@
       gap: 8px;
     }
 
+    #extract-here {
+      grid-column: 1 / -1;
+    }
+
     .target-grid button {
       background: var(--soft);
     }
 
     .detail {
-      min-height: 146px;
+      min-height: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #0c1219;
       padding: 10px;
       color: var(--muted);
       font-size: 12px;
-      overflow: hidden;
+      overflow: auto;
     }
 
     .detail strong {
@@ -717,6 +693,59 @@
       padding-top: 7px;
       border-top: 1px solid #25313e;
       color: var(--muted);
+    }
+
+    .inspector-footer {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      margin: 0 calc(var(--target-pad) * -1);
+      padding: 8px var(--target-pad) 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .app-icon {
+      width: 24px;
+      height: 24px;
+      display: block;
+      border-radius: 5px;
+      object-fit: cover;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .app-copy {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .app-title-row {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .app-title {
+      min-width: 0;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-version {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .log-toolbar {
@@ -1074,30 +1103,43 @@
     .choice-option {
       position: relative;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 9px;
+      grid-template-columns: minmax(0, 1fr);
+      width: 100%;
+      gap: 6px;
       align-items: flex-start;
-      padding: 10px 76px 10px 10px;
+      padding: 10px;
+      box-sizing: border-box;
       border: 1px solid #33475a;
       border-radius: 8px;
       background: rgba(13, 20, 28, .72);
+      color: var(--ink);
       cursor: pointer;
+      font: inherit;
+      text-align: left;
+      appearance: none;
+      -webkit-appearance: none;
       outline: none;
       transition: border-color .12s ease, background .12s ease,
                   box-shadow .12s ease, transform .12s ease;
     }
 
-    .choice-option input {
-      width: 18px;
-      height: 18px;
-      margin-top: 3px;
-      accent-color: var(--deep);
-      pointer-events: none;
-    }
-
-    .choice-option:hover {
+    .choice-option:hover,
+    .choice-option.is-controller-target {
       border-color: #5b748b;
       background: rgba(18, 28, 39, .92);
+    }
+
+    .choice-option:disabled,
+    .choice-option.is-disabled {
+      cursor: not-allowed;
+      opacity: .48;
+      transform: none;
+    }
+
+    .choice-option:disabled:hover,
+    .choice-option.is-disabled:hover {
+      border-color: #33475a;
+      background: rgba(13, 20, 28, .72);
     }
 
     .choice-option:focus,
@@ -1111,25 +1153,6 @@
       background: linear-gradient(180deg, rgba(24, 73, 54, .92),
         rgba(16, 45, 35, .92));
       box-shadow: inset 0 0 0 1px rgba(94, 224, 170, .75);
-    }
-
-    .choice-option.is-selected::after {
-      content: "Selected";
-      position: absolute;
-      right: 10px;
-      top: 10px;
-      max-width: 62px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      border: 1px solid rgba(94, 224, 170, .65);
-      border-radius: 999px;
-      padding: 3px 7px;
-      background: rgba(6, 19, 14, .72);
-      color: #a9f6d4;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
     }
 
     .choice-option.is-selected:focus,
@@ -1178,17 +1201,15 @@
     }
 
     .job {
-      position: fixed;
-      left: 50%;
-      bottom: 14px;
-      z-index: 10;
-      width: min(840px, calc(100% - 28px));
-      transform: translateX(-50%);
       display: none;
       grid-template-columns: 110px minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
-      padding: 10px;
+      min-height: 84px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: none;
     }
 
     .job.show {
@@ -1196,13 +1217,8 @@
     }
 
     .job.owner {
-      border-color: #d99b32;
-      background: #211b12;
-    }
-
-    .job.watcher {
-      border-color: #326a96;
-      background: #121d25;
+      border-color: #2f8f63;
+      background: #102018;
     }
 
     .meter {
@@ -1220,11 +1236,7 @@
     }
 
     .job.owner .meter-fill {
-      background: linear-gradient(90deg, #d99b32, #ffd37a);
-    }
-
-    .job.watcher .meter-fill {
-      background: linear-gradient(90deg, #326a96, #8fd3ff);
+      background: linear-gradient(90deg, var(--deep), #9af3c9);
     }
 
     .job-note {
@@ -1241,13 +1253,8 @@
     }
 
     .job.owner .job-note {
-      background: #33240f;
-      color: #ffd37a;
-    }
-
-    .job.watcher .job-note {
-      background: #142b3c;
-      color: #9edaff;
+      background: #143927;
+      color: #b9f4dd;
     }
 
     .job-text {
@@ -1331,37 +1338,43 @@
 
     @media (max-width: 1080px) {
       .shell {
-        grid-template-columns: 330px minmax(0, 1fr);
+        grid-template-columns: 300px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
       }
 
       .target {
         grid-column: 1 / -1;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr);
         align-items: start;
+        border-top: 1px solid var(--line);
       }
 
       .target h2,
-      .detail {
+      .detail,
+      .inspector-footer {
         grid-column: 1 / -1;
       }
     }
 
     @media (max-width: 700px) {
-      .top-inner {
-        grid-template-columns: auto minmax(0, 1fr);
-      }
-
-      .status {
-        grid-column: 1 / -1;
+      body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
       }
 
       .shell {
+        height: auto;
+        min-height: 100vh;
         grid-template-columns: 1fr;
-        padding: 10px;
+        grid-template-rows: auto minmax(540px, 1fr) auto;
       }
 
       .rail {
-        max-height: none;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
       }
 
       .side-pane.active {
@@ -1408,11 +1421,18 @@
       }
 
       .browser {
+        height: 540px;
         min-height: 540px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
       }
 
       .target {
         grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        height: auto;
+        overflow: visible;
+        border-top: 0;
       }
 
       .job {
@@ -1427,17 +1447,6 @@
   </style>
 </head>
 <body>
-  <header class="top">
-    <div class="top-inner">
-      <img class="brand" src="/icon.png" alt="">
-      <div class="title">
-        <strong>File Explorer</strong>
-        <span id="build">File Manager</span>
-      </div>
-      <div class="status" id="status"><span class="dot"></span><span>Connecting</span></div>
-    </div>
-  </header>
-
   <main class="shell">
     <aside class="rail" aria-label="Side panel">
       <div class="side-tabs" role="tablist" aria-label="Side panel content">
@@ -1465,9 +1474,9 @@
         </span>
         <span class="row-actions toolbar-actions">
           <button id="install-menu-button" class="upload-action archive menu-trigger" type="button"
-            data-icon="extract" aria-haspopup="menu" aria-expanded="false">Extract</button>
+            data-icon="extract" aria-haspopup="menu" aria-expanded="false">Upload and Extract</button>
           <button id="extract-help" class="help-action" type="button"
-            aria-label="Explain extract flow" title="Extract flow">?</button>
+            aria-label="Explain upload and extract flow" title="Upload and extract flow">?</button>
           <span id="install-menu" class="row-menu toolbar-menu" role="menu"></span>
         </span>
         <span id="selection" class="count">0 selected</span>
@@ -1483,6 +1492,14 @@
           <span></span>
         </div>
       </div>
+
+      <section id="job" class="job" aria-live="polite">
+        <strong id="job-verb">Working</strong>
+        <div class="meter"><div id="job-fill" class="meter-fill"></div></div>
+        <button id="job-cancel">Cancel</button>
+        <span id="job-note" class="job-note"></span>
+        <span id="job-text" class="job-text"></span>
+      </section>
     </section>
 
     <aside class="target" aria-label="Transfer target">
@@ -1491,6 +1508,7 @@
       <div class="target-buttons">
         <button id="copy" class="primary">Copy Here</button>
         <button id="move">Move Here</button>
+        <button id="extract-here" disabled>Extract Here</button>
       </div>
       <div class="target-grid">
         <button data-target="/data/homebrew">/data/homebrew</button>
@@ -1503,16 +1521,18 @@
         <strong>No selection</strong>
         <span>Ready</span>
       </div>
+      <footer class="inspector-footer" aria-label="File browser status">
+        <img class="app-icon" src="/icon.png" alt="" width="24" height="24" loading="lazy" decoding="async">
+        <div class="app-copy">
+          <div class="app-title-row">
+            <strong class="app-title">File Browser</strong>
+            <span class="status" id="status"><span class="dot"></span><span>Connecting</span></span>
+          </div>
+          <span id="build" class="app-version">File Manager</span>
+        </div>
+      </footer>
     </aside>
   </main>
-
-  <section id="job" class="job" aria-live="polite">
-    <strong id="job-verb">Working</strong>
-    <div class="meter"><div id="job-fill" class="meter-fill"></div></div>
-    <button id="job-cancel">Cancel</button>
-    <span id="job-note" class="job-note"></span>
-    <span id="job-text" class="job-text"></span>
-  </section>
 
   <div id="log-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
     <section class="modal-card">
@@ -1537,46 +1557,65 @@
         <div id="compression-format-section" class="option-section">
           <strong>Compression Type</strong>
           <div class="choice-grid">
-            <label class="choice-option">
-              <input type="radio" name="compression-format" value="pfs" checked>
+            <button class="choice-option is-selected" type="button"
+              data-radio-name="compression-format" data-radio-value="pfs" aria-pressed="true">
               <span>
                 <strong>Compressed PFS</strong>
                 <small>Current .ffpfsc layout with nested pfs_image.dat.</small>
               </span>
-            </label>
-            <label class="choice-option">
-              <input type="radio" name="compression-format" value="exfat">
+            </button>
+            <button class="choice-option" type="button"
+              data-radio-name="compression-format" data-radio-value="exfat" aria-pressed="false">
               <span>
                 <strong>Compressed exFAT</strong>
                 <small>.ffpfsc outer container with nested &lt;TITLE_ID&gt;.exfat at 64 KiB clusters.</small>
               </span>
-            </label>
+            </button>
+          </div>
+        </div>
+        <div id="compression-pfsc-section" class="option-section">
+          <strong>PFSC Storage</strong>
+          <div class="choice-grid">
+            <button class="choice-option is-selected" type="button"
+              data-radio-name="compression-pfsc-mode" data-radio-value="zlib" aria-pressed="true">
+              <span>
+                <strong>Compress</strong>
+                <small>Default .ffpfsc behavior. Smaller output, uses PFSC zlib blocks.</small>
+              </span>
+            </button>
+            <button class="choice-option" type="button"
+              data-radio-name="compression-pfsc-mode" data-radio-value="raw" aria-pressed="false">
+              <span>
+                <strong>Save as raw (TESTING ONLY)</strong>
+                <small>Temporary diagnostic mode. Keeps the PFSC wrapper but stores every block uncompressed.</small>
+              </span>
+            </button>
           </div>
         </div>
         <div class="option-section">
           <strong id="compression-source-title">Source Handling</strong>
           <div id="compression-delete-grid" class="choice-grid">
-            <label class="choice-option">
-              <input type="radio" name="compression-delete" value="keep" checked>
+            <button class="choice-option is-selected" type="button"
+              data-radio-name="compression-delete" data-radio-value="keep" aria-pressed="true">
               <span>
                 <strong>Keep both</strong>
                 <small>Leave the source and the new output in place.</small>
               </span>
-            </label>
-            <label class="choice-option">
-              <input type="radio" name="compression-delete" value="after">
+            </button>
+            <button class="choice-option" type="button"
+              data-radio-name="compression-delete" data-radio-value="after" aria-pressed="false">
               <span>
                 <strong>Delete when finished</strong>
                 <small>Remove the source only after the final output rename succeeds.</small>
               </span>
-            </label>
-            <label class="choice-option">
-              <input type="radio" name="compression-delete" value="stream">
+            </button>
+            <button class="choice-option" type="button"
+              data-radio-name="compression-delete" data-radio-value="stream" aria-pressed="false">
               <span>
                 <strong>Delete while converting</strong>
                 <small>Free space progressively as data ranges are safely committed.</small>
               </span>
-            </label>
+            </button>
           </div>
         </div>
         <div id="compression-risk" class="option-warning hidden"></div>
@@ -1903,16 +1942,32 @@
     async function startHomebrewPrepare(path, info, options) {
       const label = prepareActionLabel(info);
       const verb = info && info.patchMode ? 'patch' : 'prepare';
-      setJobBox(verb, label, 0);
       let url = '/api/fs/app-prepare?path=' + encodeURIComponent(cleanPath(path));
-      if (options && options.inline) url += '&inline=1';
-      const result = await api(url);
-      if (result.background) {
-        setTimeout(() => {
-          if (!state.jobTimer) pollJob();
-        }, 150);
+      if (options && options.inline) {
+        setJobBox(verb, label, 0);
+        url += '&inline=1';
+        const result = await api(url);
+        if (result.background) {
+          setTimeout(() => {
+            if (!state.jobTimer) pollJob();
+          }, 150);
+        }
+        return result;
       }
-      return result;
+      const queued = await enqueueBackendActivity(verb, pathBaseName(path), path, url, {
+        startVerb: verb,
+        startText: label
+      });
+      return {
+        ok: true,
+        background: true,
+        queued: true,
+        queueId: queued.queueId
+      };
+    }
+
+    function queuedStartedLabel(result, startedLabel, queuedLabel) {
+      return result && result.queued ? queuedLabel : startedLabel;
     }
 
     async function preparePromptNow() {
@@ -1938,7 +1993,8 @@
             info,
             result
           });
-          toast('Patch apply started', 'ok');
+          toast(queuedStartedLabel(result, 'Patch apply started',
+            'Patch apply queued'), 'ok');
           return;
         }
         hidePreparePrompt({
@@ -1946,7 +2002,9 @@
           info,
           result
         });
-        toast(result.background ? prepareActionLabel(info) + ' started' :
+        toast(result.background ?
+          queuedStartedLabel(result, prepareActionLabel(info) + ' started',
+            prepareActionLabel(info) + ' queued') :
           (info && info.patchMode ? 'Patch applied' : 'Executable prepared'), 'ok');
         scheduleLogsReveal();
       } catch (err) {
@@ -2127,23 +2185,28 @@
       if (isOwnRarUpload()) {
         box.classList.add('owner');
         note.textContent = 'Uploading RAR and extracting. Do not close this tab until the operation completes.';
-      } else {
-        box.classList.add('watcher');
-        note.textContent = 'Watching RAR upload from another tab. Safe to close this tab; leave the uploading tab open.';
+        note.classList.add('show');
       }
-      note.classList.add('show');
+    }
+
+    function jobVerbLabel(verb) {
+      const key = String(verb || '').toLowerCase();
+      if (!key) return 'Working';
+      if (key === 'unzip' || key === 'unrar') return 'Upload and Extract';
+      return activityKindLabel(key);
     }
 
     function setJobBox(verb, text, pct) {
+      const rawVerb = verb || '';
       if (state.jobTimer) {
         clearInterval(state.jobTimer);
         state.jobTimer = 0;
       }
       el('job').classList.add('show');
-      el('job-verb').textContent = verb || 'Working';
+      el('job-verb').textContent = jobVerbLabel(rawVerb);
       el('job-text').textContent = text || '';
       el('job-fill').style.width = Math.max(0, Math.min(100, pct || 0)).toFixed(1) + '%';
-      updateJobRole({ busy: true, verb: verb || '' });
+      updateJobRole({ busy: true, verb: rawVerb });
     }
 
     function uploadProgressText(doneBytes, totalBytes, startedAt, doneFiles, count, name, failed, cancelling) {
@@ -2572,19 +2635,6 @@
           ['Checksum bytes', fields.ChecksumBytes ? shortSize(Number(fields.ChecksumBytes)) : '-']
         );
       }
-      if (fields.ShadowMountImage) {
-        const shadowRows = [
-          ['ShadowMount image', fields.ShadowMountImage],
-          ['ShadowMount config', fields.ShadowMountAutotune || '-']
-        ];
-        if (fields.ShadowMountAction) shadowRows.splice(1, 0,
-          ['ShadowMount action', fields.ShadowMountAction]);
-        if (fields.ShadowMountSector) shadowRows.splice(1, 0,
-          ['ShadowMount sector', fields.ShadowMountSector]);
-        if (fields.ShadowMountRemoved) shadowRows.push(
-          ['ShadowMount removed', fields.ShadowMountRemoved]);
-        rows.splice(3, 0, ...shadowRows);
-      }
       if (fields.ArchiveAction) {
         const archiveRows = [['Archive action', fields.ArchiveAction]];
         if (fields.PatchTarget) archiveRows.push(['Patch target', fields.PatchTarget]);
@@ -2666,8 +2716,8 @@
 
 
     function showExtractHelp() {
-      showInfoModal('Extract Flow',
-        'Extract streams ZIP/RAR upload and extraction at the same time to reduce space needed. ' +
+      showInfoModal('Upload and Extract Flow',
+        'Upload and Extract streams ZIP/RAR upload and extraction at the same time to reduce space needed. ' +
         'Archives extract normally first. If a PS5 app is found, you can prepare it for Homebrew after extraction.');
     }
 
@@ -2959,7 +3009,9 @@
       try {
         const result = await startHomebrewPrepare(path, prepareInfo);
         closeLogModal();
-        toast(result.background ? prepareActionLabel(prepareInfo) + ' started' :
+        toast(result.background ?
+          queuedStartedLabel(result, prepareActionLabel(prepareInfo) + ' started',
+            prepareActionLabel(prepareInfo) + ' queued') :
           'Homebrew app is already prepared', 'ok');
         scheduleLogsReveal();
       } catch (err) {
@@ -3028,10 +3080,11 @@
       const info = decision && decision.info;
       const target = (info && info.preparedPath) || (result && result.path) || '';
       if (decision && decision.action === 'patchStarted') {
+        const queued = decision.result && decision.result.queued;
         return {
-          current: 'Patch apply started',
+          current: queued ? 'Patch apply queued' : 'Patch apply started',
           extra: [
-            'ArchiveAction: Patch apply started',
+            'ArchiveAction: ' + (queued ? 'Patch apply queued' : 'Patch apply started'),
             target ? 'PatchTarget: ' + target : '',
             info && info.deleteExtraSample ? 'PatchRemovedExtra: ' + info.deleteExtraSample : ''
           ].filter(Boolean).join('\n')
@@ -3099,6 +3152,82 @@
       scheduleLogsReveal();
       toast('Queued ' + activityKindLabel(kind) + ': ' + item.displayName, 'ok');
       return item;
+    }
+
+    async function enqueueBackendActivity(kind, displayName, destPath, backendUrl, options) {
+      return enqueueLocalActivity(kind, displayName, destPath,
+        (options && options.totalBytes) || 0,
+        (options && options.totalItems) || 0,
+        Object.assign({
+          backendUrl,
+          startVerb: kind,
+          startText: 'Starting ' + activityKindLabel(kind).toLowerCase()
+        }, options || {}));
+    }
+
+    function backendResultTarget(result, item) {
+      return (result && (result.output || result.path || result.preparedPath)) ||
+        (item && (item.destPath || item.displayName)) || '';
+    }
+
+    async function runQueuedBackendActivity(item) {
+      if (!item || !item.backendUrl) {
+        throw new Error('Unsupported activity kind');
+      }
+      state.uploadAbort = false;
+      setSideMode('activity');
+      setJobBox(item.startVerb || item.kind, item.startText || 'Starting', 0);
+      await activityProgress(item, 0, item.totalBytes || 0, 0, 0, true);
+
+      const started = await api(item.backendUrl + activityLeaseExtra(item));
+      const logName = started.logName || '';
+      const target = backendResultTarget(started, item);
+
+      if (!started.background) {
+        await activityComplete(item, 'success', '', 0, item.totalBytes || 0,
+          1, 0, {
+            logName,
+            current: target || item.displayName
+          });
+        if (logName) state.selectedLog = 'log:' + logName;
+        toast(activityKindLabel(item.kind) + ' finished: ' +
+          (item.displayName || target || item.kind), 'ok');
+        return { status: 'success', error: '', copiedBytes: 0, doneItems: 1 };
+      }
+
+      setTimeout(() => {
+        if (state.jobTimer) return;
+        pollJob();
+      }, 150);
+
+      const done = await waitJobIdle();
+      const error = done.error || '';
+      const status = error ?
+        (isCancelledError(error) ? 'cancelled' : 'failed') :
+        'success';
+      await activityComplete(item, status, error,
+        Number(done.copiedBytes || 0), Number(done.totalBytes || 0),
+        Number(done.doneFiles || 0), Number(done.failedFiles || 0), {
+          logName,
+          current: done.current || target || item.displayName
+        });
+
+      if (logName) state.selectedLog = 'log:' + logName;
+      if (status === 'success') {
+        toast(activityKindLabel(item.kind) + ' finished: ' +
+          (item.displayName || target || item.kind), 'ok');
+      } else if (status === 'cancelled') {
+        toast(activityKindLabel(item.kind) + ' cancelled', 'err');
+      } else {
+        toast(activityKindLabel(item.kind) + ': ' + (error || 'failed'), 'err');
+      }
+      return {
+        status,
+        error,
+        copiedBytes: Number(done.copiedBytes || 0),
+        doneItems: Number(done.doneFiles || 0),
+        failedItems: Number(done.failedFiles || 0)
+      };
     }
 
 
@@ -3216,7 +3345,9 @@
       (async () => {
         let result = { status: 'failed', error: 'activity failed' };
         try {
-          if (item.kind === 'upload') {
+          if (item.backendUrl) {
+            result = await runQueuedBackendActivity(item);
+          } else if (item.kind === 'upload') {
             result = await runUploadFiles(item.files || [], item);
           } else if (item.kind === 'zip') {
             result = await uploadZip(item.file, item);
@@ -3250,6 +3381,40 @@
 
     function selectedEntries() {
       return state.entries.filter((entry) => state.selected.has(entry.name));
+    }
+
+    function selectedArchiveEntry() {
+      const entries = selectedEntries();
+      if (entries.length !== 1) return null;
+      const entry = entries[0];
+      return entry && !entry.dir && localArchiveKind(entry.name) ? entry : null;
+    }
+
+    function selectedArchiveTargetPath() {
+      const target = el('target-path');
+      return cleanPath(target && target.value ? target.value : '/data/homebrew');
+    }
+
+    function updateExtractHereButton() {
+      const button = el('extract-here');
+      if (!button) return;
+      const entry = selectedArchiveEntry();
+      const dest = selectedArchiveTargetPath();
+      button.disabled = !entry;
+      button.setAttribute('aria-disabled', entry ? 'false' : 'true');
+      button.title = entry ?
+        ('Extract ' + entry.name + ' to ' + dest) :
+        'Select one ZIP or RAR file';
+    }
+
+    async function extractSelectedHere() {
+      const entry = selectedArchiveEntry();
+      if (!entry) {
+        updateExtractHereButton();
+        toast('Select one ZIP or RAR file', 'err');
+        return;
+      }
+      await extractLocalArchive(entry, selectedArchiveTargetPath());
     }
 
     function removeEntriesFromView(names) {
@@ -3302,7 +3467,7 @@
       updateListSelectionState();
     }
 
-    async function extractLocalArchive(entry) {
+    async function extractLocalArchive(entry, destPath) {
       if (!entry || entry.dir) return;
       const kind = localArchiveKind(entry.name);
       if (!kind) {
@@ -3310,10 +3475,12 @@
         return;
       }
 
-      const initialDest = '/data/homebrew';
-      const chosen = prompt('Extract to', initialDest);
-      if (!chosen) return;
-      const dest = cleanPath(chosen);
+      let dest = destPath ? cleanPath(destPath) : '';
+      if (!dest) {
+        const chosen = prompt('Extract to', selectedArchiveTargetPath());
+        if (!chosen) return;
+        dest = cleanPath(chosen);
+      }
       const archivePath = joinPath(state.path, entry.name);
       let password = '';
       let askedPassword = false;
@@ -3324,21 +3491,37 @@
           '&dest=' + encodeURIComponent(dest);
         if (password) url += '&password=' + encodeURIComponent(password);
 
+        let extractionDone = false;
+        let pollDelay = 0;
         try {
           setSideMode('activity');
           setJobBox(verb, 'Starting local extraction', 0);
-          setTimeout(() => {
-            if (state.jobTimer) return;
+          pollDelay = setTimeout(() => {
+            if (extractionDone || state.jobTimer) return;
             pollJob();
           }, 150);
           const result = await api(url);
+          extractionDone = true;
+          clearTimeout(pollDelay);
+          if (state.jobTimer) {
+            clearInterval(state.jobTimer);
+            state.jobTimer = 0;
+          }
           await waitJobIdle().catch(() => {});
           await openPath(dest).catch(() => refresh());
-          toast('Extracted to ' + (result.path || dest), 'ok');
-          await maybeOfferAppPrepare(result.path || dest);
+          const decision = await maybeOfferAppPrepare(result.path || dest, {
+            wait: true,
+            inline: true
+          });
+          const meta = archiveDecisionMeta(decision, result);
+          toast(meta.current === 'Extracted archive' ?
+            ('Extracted ' + Number(result.files || 0) + ' file(s)') :
+            meta.current, 'ok');
           scheduleLogsReveal();
           return;
         } catch (err) {
+          extractionDone = true;
+          clearTimeout(pollDelay);
           if (kind === 'rar' && isRarPasswordError(err.message)) {
             const nextPassword = prompt(askedPassword ?
               'Wrong RAR password. Try again' :
@@ -3508,12 +3691,12 @@
       }
     }
 
-	    function openEntry(entry) {
+    function openEntry(entry) {
       const next = joinPath(state.path, entry.name);
       if (entry.dir) {
         openPath(next);
       } else if (localArchiveKind(entry.name)) {
-        extractLocalArchive(entry);
+        extractLocalArchive(entry, selectedArchiveTargetPath());
       } else {
         window.open(fileUrl(next), '_blank');
       }
@@ -3580,6 +3763,9 @@
       document.querySelectorAll('.row-menu.open').forEach((menu) => {
         if (menu === except) return;
         menu.classList.remove('open');
+        menu.style.left = '';
+        menu.style.top = '';
+        menu.style.maxHeight = '';
         const button = menu.parentElement &&
           menu.parentElement.querySelector('.row-more, .menu-trigger');
         if (button) button.setAttribute('aria-expanded', 'false');
@@ -3590,15 +3776,26 @@
       const gap = 6;
       const margin = 8;
       const rect = anchor.getBoundingClientRect();
-      const width = menu.offsetWidth || 150;
-      const height = menu.offsetHeight || 104;
+      menu.style.maxHeight = '';
+      menu.style.maxWidth = Math.max(170, window.innerWidth - margin * 2) + 'px';
+      const menuRect = menu.getBoundingClientRect();
+      const width = menuRect.width || menu.offsetWidth || 170;
+      const height = menuRect.height || menu.offsetHeight || 104;
       let left = rect.right - width;
       let top = rect.bottom + gap;
+      const below = Math.max(0, window.innerHeight - rect.bottom - gap - margin);
+      const above = Math.max(0, rect.top - gap - margin);
+      const availableHeight = Math.max(96, Math.max(below, above));
+      const fittedHeight = Math.min(height, availableHeight);
 
       left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
-      if (top + height > window.innerHeight - margin) {
-        top = Math.max(margin, rect.top - height - gap);
+      if (height > availableHeight) {
+        menu.style.maxHeight = availableHeight + 'px';
       }
+      if (below < fittedHeight && above > below) {
+        top = rect.top - fittedHeight - gap;
+      }
+      top = Math.max(margin, Math.min(top, window.innerHeight - fittedHeight - margin));
 
       menu.style.left = left + 'px';
       menu.style.top = top + 'px';
@@ -3680,9 +3877,6 @@
       const menu = document.createElement('div');
       menu.className = 'row-menu';
       menu.setAttribute('role', 'menu');
-      if (!entry.dir && localArchiveKind(entry.name)) {
-        menu.appendChild(makeMenuButton('extract', 'Extract', () => extractLocalArchive(entry)));
-      }
       if (!entry.dir && entry.decompressible) {
         menu.appendChild(makeMenuButton('extract', 'Decompress...', () => openCompressionModal('decompress', entry)));
       }
@@ -3737,9 +3931,12 @@
         closeRowMenus(menu);
         menu.classList.toggle('open', open);
         more.setAttribute('aria-expanded', open ? 'true' : 'false');
-        if (open && (event.detail === 0 || more === document.activeElement)) {
-          const first = menu.querySelector('button');
-          if (first) setTimeout(() => first.focus(), 0);
+        if (open) {
+          positionFloatingMenu(menu, more);
+          if (event.detail === 0 || more === document.activeElement) {
+            const first = menu.querySelector('button');
+            if (first) setTimeout(() => first.focus(), 0);
+          }
         }
       });
 
@@ -3844,6 +4041,7 @@
       const token = ++state.detailToken;
       const entries = selectedEntries();
       el('selection').textContent = entries.length + ' selected';
+      updateExtractHereButton();
 
       const detail = el('detail');
       if (!entries.length) {
@@ -4180,39 +4378,116 @@
     }
 
     function selectedRadioValue(name, fallback) {
-      const checked = document.querySelector('input[name="' + name + '"]:checked');
-      return checked ? checked.value : fallback;
+      const selected = Array.from(document.querySelectorAll('.choice-option'))
+        .find((option) => option.dataset.radioName === name &&
+          option.classList.contains('is-selected'));
+      return selected ? selected.dataset.radioValue : fallback;
+    }
+
+    function choiceOptionsByName(name) {
+      return Array.from(document.querySelectorAll('.choice-option'))
+        .filter((option) => option.dataset.radioName === name);
+    }
+
+    function setChoiceValue(name, value) {
+      let found = false;
+      choiceOptionsByName(name).forEach((option) => {
+        const selected = !option.disabled && option.dataset.radioValue === value;
+        option.classList.toggle('is-selected', selected);
+        option.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        option.setAttribute('aria-checked', selected ? 'true' : 'false');
+        if (selected) found = true;
+      });
+      return found;
     }
 
     function syncChoiceOptionStates() {
-      document.querySelectorAll('.choice-option').forEach((label) => {
-        const input = label.querySelector('input[type="radio"]');
-        if (!input) return;
-        const checked = !!input.checked;
-        label.classList.toggle('is-selected', checked);
-        label.setAttribute('aria-checked', checked ? 'true' : 'false');
+      const names = new Set();
+      document.querySelectorAll('.choice-option[data-radio-name]').forEach((option) => {
+        names.add(option.dataset.radioName);
+      });
+      names.forEach((name) => {
+        const choices = choiceOptionsByName(name);
+        let selected = choices.find((option) =>
+          !option.disabled && option.classList.contains('is-selected'));
+        const enabled = choices.filter((option) => !option.disabled);
+        if (!selected && enabled[0]) selected = enabled[0];
+        choices.forEach((option) => {
+          const checked = option === selected;
+          option.classList.toggle('is-selected', checked);
+          option.setAttribute('aria-pressed', checked ? 'true' : 'false');
+          option.setAttribute('aria-checked', checked ? 'true' : 'false');
+        });
       });
     }
 
     function visibleChoiceOptions(group) {
       return Array.from((group || document).querySelectorAll('.choice-option'))
-        .filter((option) => {
-          const input = option.querySelector('input[type="radio"]');
-          return input && option.offsetParent !== null;
-        });
+        .filter((option) => option.dataset.radioName && !option.disabled &&
+          option.offsetParent !== null);
+    }
+
+    function setChoiceDisabled(name, value, disabled) {
+      choiceOptionsByName(name).forEach((option) => {
+        if (option.dataset.radioValue !== value) return;
+        option.disabled = !!disabled;
+        option.classList.toggle('is-disabled', !!disabled);
+        option.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        if (disabled) {
+          option.classList.remove('is-selected');
+          option.setAttribute('aria-pressed', 'false');
+          option.setAttribute('aria-checked', 'false');
+        }
+      });
+    }
+
+    function updateCompressionCompatibility() {
+      const format = selectedRadioValue('compression-format', 'pfs');
+      const rawExfatDisabled = format === 'exfat';
+      setChoiceDisabled('compression-pfsc-mode', 'raw', rawExfatDisabled);
+      if (rawExfatDisabled &&
+          selectedRadioValue('compression-pfsc-mode', 'zlib') === 'raw') {
+        setChoiceValue('compression-pfsc-mode', 'zlib');
+      }
+      syncChoiceOptionStates();
     }
 
     function selectChoiceOption(option) {
-      const input = option && option.querySelector('input[type="radio"]');
-      if (!input || input.checked) {
+      if (option && option.disabled) return;
+      const name = option && option.dataset.radioName;
+      const value = option && option.dataset.radioValue;
+      if (!name || !value) {
         syncChoiceOptionStates();
         updateCompressionRisk();
         return;
       }
-      input.checked = true;
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-      syncChoiceOptionStates();
+      setChoiceValue(name, value);
+      updateCompressionCompatibility();
       updateCompressionRisk();
+    }
+
+    function markChoicePointerTarget(option) {
+      document.querySelectorAll('.choice-option.is-controller-target').forEach((item) => {
+        if (item !== option) item.classList.remove('is-controller-target');
+      });
+      if (!option) return;
+      option.classList.add('is-controller-target');
+      try {
+        option.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      } catch (err) {
+        option.scrollIntoView(false);
+      }
+      const rect = option.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      ['pointerover', 'pointermove', 'mouseover', 'mousemove'].forEach((type) => {
+        option.dispatchEvent(new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y
+        }));
+      });
     }
 
     function focusChoiceNeighbor(option, direction) {
@@ -4222,40 +4497,39 @@
       if (index < 0 || choices.length < 2) return;
       const next = choices[(index + direction + choices.length) % choices.length];
       next.focus();
+      markChoicePointerTarget(next);
     }
 
     function setupChoiceOptions() {
-      document.querySelectorAll('.choice-option').forEach((label) => {
-        const input = label.querySelector('input[type="radio"]');
-        if (!input || label.dataset.choiceReady === '1') return;
-        label.dataset.choiceReady = '1';
-        label.tabIndex = 0;
-        label.setAttribute('role', 'radio');
-        input.tabIndex = -1;
-        input.addEventListener('change', () => {
-          syncChoiceOptionStates();
-          updateCompressionRisk();
+      document.querySelectorAll('.choice-option[data-radio-name]').forEach((button) => {
+        if (button.dataset.choiceReady === '1') return;
+        button.dataset.choiceReady = '1';
+        button.addEventListener('focus', () => {
+          markChoicePointerTarget(button);
         });
-        label.addEventListener('click', () => {
-          setTimeout(() => {
-            syncChoiceOptionStates();
-            updateCompressionRisk();
-          }, 0);
+        button.addEventListener('blur', () => {
+          button.classList.remove('is-controller-target');
         });
-        label.addEventListener('keydown', (event) => {
+        button.addEventListener('mouseenter', () => {
+          markChoicePointerTarget(button);
+        });
+        button.addEventListener('click', () => {
+          selectChoiceOption(button);
+        });
+        button.addEventListener('keydown', (event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            selectChoiceOption(label);
+            selectChoiceOption(button);
             return;
           }
           if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
             event.preventDefault();
-            focusChoiceNeighbor(label, 1);
+            focusChoiceNeighbor(button, 1);
             return;
           }
           if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
             event.preventDefault();
-            focusChoiceNeighbor(label, -1);
+            focusChoiceNeighbor(button, -1);
           }
         });
       });
@@ -4263,16 +4537,16 @@
     }
 
     function resetCompressionModalDefaults(mode) {
-      const pfs = document.querySelector('input[name="compression-format"][value="pfs"]');
-      const keep = document.querySelector('input[name="compression-delete"][value="keep"]');
-      if (pfs) pfs.checked = true;
-      if (keep) keep.checked = true;
+      setChoiceValue('compression-format', 'pfs');
+      setChoiceValue('compression-pfsc-mode', 'zlib');
+      setChoiceValue('compression-delete', 'keep');
       el('compression-format-section').classList.toggle('hidden', mode !== 'compress');
+      el('compression-pfsc-section').classList.toggle('hidden', mode !== 'compress');
       el('compression-source-title').textContent =
         mode === 'compress' ? 'Source Handling' : 'Compressed Image Handling';
       el('compression-modal-start').textContent =
         mode === 'compress' ? 'Start Compression' : 'Start Decompression';
-      syncChoiceOptionStates();
+      updateCompressionCompatibility();
     }
 
     function updateCompressionRisk() {
@@ -4335,6 +4609,7 @@
       const mode = modalState.mode;
       const options = {
         format: selectedRadioValue('compression-format', 'pfs'),
+        pfscMode: selectedRadioValue('compression-pfsc-mode', 'zlib'),
         deletePolicy: selectedRadioValue('compression-delete', 'keep')
       };
       closeCompressionModal();
@@ -4344,11 +4619,13 @@
 
     async function compressApp(entry, overwrite, options) {
       let format = 'pfs';
+      let pfscMode = 'zlib';
       let deletePolicy = 'keep';
       if (typeof options === 'boolean') {
         deletePolicy = options ? 'stream' : 'keep';
       } else if (options) {
         format = options.format || 'pfs';
+        pfscMode = options.pfscMode || 'zlib';
         deletePolicy = options.deletePolicy || 'keep';
       }
       if (!entry || !entry.dir || !entry.compressible) {
@@ -4365,26 +4642,22 @@
 
       try {
         setSideMode('activity');
-        setJobBox('compress', deletePolicy === 'keep' ? 'Starting compression' : 'Starting conversion', 0);
         let url = '/api/fs/app-compress?path=' +
           encodeURIComponent(path) + '&overwrite=' + (overwrite ? '1' : '0') +
           '&format=' + encodeURIComponent(format) +
+          '&pfsc=' + encodeURIComponent(pfscMode) +
           '&delete=' + encodeURIComponent(deletePolicy);
-        const result = await api(url);
-        toast((deletePolicy === 'keep' ? 'Compression' : 'Conversion') + ' started: ' +
-          ((result.output || output || '').slice((result.output || output || '').lastIndexOf('/') + 1) ||
-            entry.name), 'ok');
-        setTimeout(() => {
-          if (state.jobTimer) return;
-          pollJob();
-        }, 150);
+        await enqueueBackendActivity('compress', entry.name, output || path, url, {
+          startVerb: 'compress',
+          startText: deletePolicy === 'keep' ? 'Starting compression' : 'Starting conversion'
+        });
       } catch (err) {
         if (!overwrite && /output exists/i.test(err.message || '') &&
           confirm('Replace existing compressed image?')) {
           entry.compressOutputExists = true;
-          return compressApp(entry, true, { format, deletePolicy });
+          return compressApp(entry, true, { format, pfscMode, deletePolicy });
         }
-        toast((deletePolicy === 'keep' ? 'compress' : 'convert') + ': ' + err.message, 'err');
+        toast((deletePolicy === 'keep' ? 'Compress' : 'Convert') + ': ' + err.message, 'err');
         setTimeout(() => {
           if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
         }, 1200);
@@ -4412,25 +4685,20 @@
 
       try {
         setSideMode('activity');
-        setJobBox('decompress', deletePolicy === 'keep' ? 'Starting decompression' : 'Starting conversion', 0);
         let url = '/api/fs/app-decompress?path=' +
           encodeURIComponent(path) + '&overwrite=' + (overwrite ? '1' : '0') +
           '&delete=' + encodeURIComponent(deletePolicy);
-        const result = await api(url);
-        toast((deletePolicy === 'keep' ? 'Decompression' : 'Conversion') + ' started: ' +
-          ((result.output || output || '').slice((result.output || output || '').lastIndexOf('/') + 1) ||
-            entry.name), 'ok');
-        setTimeout(() => {
-          if (state.jobTimer) return;
-          pollJob();
-        }, 150);
+        await enqueueBackendActivity('decompress', entry.name, output || path, url, {
+          startVerb: 'decompress',
+          startText: deletePolicy === 'keep' ? 'Starting decompression' : 'Starting conversion'
+        });
       } catch (err) {
         if (!overwrite && /output exists/i.test(err.message || '') &&
           confirm('Replace existing app folder?')) {
           entry.decompressOutputExists = true;
           return decompressApp(entry, true, { deletePolicy });
         }
-        toast((deletePolicy === 'keep' ? 'decompress' : 'convert') + ': ' + err.message, 'err');
+        toast((deletePolicy === 'keep' ? 'Decompress' : 'Convert') + ': ' + err.message, 'err');
         setTimeout(() => {
           if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
         }, 1200);
@@ -5293,7 +5561,7 @@
           const pct = job.totalBytes > 0 ?
             Math.max(0, Math.min(100, (job.copiedBytes / job.totalBytes) * 100)) : 0;
           fill.style.width = pct.toFixed(1) + '%';
-          verb.textContent = job.verb || 'Working';
+          verb.textContent = jobVerbLabel(job.verb);
           text.textContent = jobProgressText(job);
           updateJobRole(job);
           if (state.activeQueueId && state.activeLeaseToken) {
@@ -5391,8 +5659,11 @@
       });
       el('copy').addEventListener('click', () => transfer('copy'));
       el('move').addEventListener('click', () => transfer('move'));
+      el('extract-here').addEventListener('click', extractSelectedHere);
+      el('target-path').addEventListener('input', updateExtractHereButton);
       el('target-current').addEventListener('click', () => {
         el('target-path').value = state.path;
+        updateExtractHereButton();
       });
       el('open-target').addEventListener('click', () => {
         openPath(el('target-path').value);
@@ -5400,6 +5671,7 @@
       document.querySelectorAll('[data-target]').forEach((button) => {
         button.addEventListener('click', () => {
           el('target-path').value = button.dataset.target;
+          updateExtractHereButton();
         });
       });
       el('job-cancel').addEventListener('click', () => {
@@ -5467,6 +5739,10 @@
       document.addEventListener('click', (event) => {
         if (!insideClass(event.target, 'row-actions')) closeRowMenus();
       });
+      window.addEventListener('resize', () => closeRowMenus());
+      document.addEventListener('scroll', (event) => {
+        if (!insideClass(event.target, 'row-menu')) closeRowMenus();
+      }, true);
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           closeCompressionModal();
