@@ -559,10 +559,14 @@ transfer_upload_rar_request(const http_request_t *req, const char *initial_data,
   char stage[1024], final_base[1024];
   char err[240] = {0};
   char lease_err[160] = {0};
+  char defer_arg[16] = {0};
+  char log_name[256] = {0};
   activity_request_ctx_t activity = {0};
   int pipe_ready = 0;
   int producer_started = 0;
   int rc = -1;
+  int defer_activity = 0;
+  int activity_deferred = 0;
   long final_files = 0;
 
   body_reader_init(&reader, req->fd, initial_data, initial_size, content_size);
@@ -582,6 +586,11 @@ transfer_upload_rar_request(const http_request_t *req, const char *initial_data,
     rar_log_event("request reject bad-lease err=%s", lease_err);
     body_reader_drain(&reader, 0);
     return serve_error(req, 409, lease_err[0] ? lease_err : "bad activity lease");
+  }
+  if(websrv_get_query_arg(req, "deferActivity", defer_arg,
+                          sizeof(defer_arg)) &&
+     strcmp(defer_arg, "0") != 0) {
+    defer_activity = 1;
   }
   if(!websrv_get_query_arg(req, "path", dest, sizeof(dest)) ||
      !path_is_safe(dest) ||
@@ -829,21 +838,27 @@ transfer_upload_rar_request(const http_request_t *req, const char *initial_data,
   }
   if(pipe_ready) zip_pipe_destroy(&pipe);
   job_end(rc, rc == 0 ? NULL : (err[0] ? err : "rar upload failed"));
+  job_log_name(log_name, sizeof(log_name));
   if(activity.queued) {
-    char log_name[256];
     const char *target = final_base[0] ? final_base : dest;
     const char *activity_err = rc == 0 ? NULL : (err[0] ? err : "rar upload failed");
     if(rc != 0 && !manifest.password[0] && rar_error_is_password(err)) {
       activity_err = "password required";
     }
-    job_log_name(log_name, sizeof(log_name));
-    activity_finish_queue(activity.queue_id, rc, activity_err,
-                          target,
-                          rc == 0 ? zip_job_long((uint64_t)content_size)
-                                  : atomic_load(&g_job.copied_bytes),
-                          rc == 0 ? atomic_load(&g_job.done_files) : 0,
-                          rc == 0 ? 0 : 1,
-                          log_name);
+    if(rc == 0 && defer_activity) {
+      activity_deferred = 1;
+      activity_defer_queue_success(activity.queue_id, target,
+                                   zip_job_long((uint64_t)content_size),
+                                   atomic_load(&g_job.done_files), log_name);
+    } else {
+      activity_finish_queue(activity.queue_id, rc, activity_err,
+                            target,
+                            rc == 0 ? zip_job_long((uint64_t)content_size)
+                                    : atomic_load(&g_job.copied_bytes),
+                            rc == 0 ? atomic_load(&g_job.done_files) : 0,
+                            rc == 0 ? 0 : 1,
+                            log_name);
+    }
   }
   rar_log_event("request done rc=%d err=%s", rc,
                 err[0] ? err : "none");
@@ -856,7 +871,10 @@ transfer_upload_rar_request(const http_request_t *req, const char *initial_data,
   json_buf_t b = {0};
   if(json_append(&b, "{\"ok\":true,\"path\":") != 0 ||
      json_string(&b, final_base) != 0 ||
-     json_appendf(&b, ",\"files\":%ld}", final_files) != 0) {
+     json_appendf(&b, ",\"files\":%ld,\"activityDeferred\":%s,\"logName\":",
+                  final_files, activity_deferred ? "true" : "false") != 0 ||
+     json_string(&b, log_name) != 0 ||
+     json_append(&b, "}") != 0) {
     free(b.data);
     return -1;
   }

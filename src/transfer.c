@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -21,6 +22,7 @@
 #include <unistd.h>
 
 #include "archive_common.h"
+#include "pfs_compress.h"
 #include "rar_transfer.h"
 #include "transfer.h"
 #include "transfer_internal.h"
@@ -33,7 +35,10 @@
 #define UPLOAD_CHUNK_MAX (16 * 1024 * 1024)
 #define OP_LOG_DIR "/data/FileExplorer/logs"
 #define OP_LOG_READ_MAX (512 * 1024)
+#define SHADOWMOUNT_AUTOTUNE_FILE "/data/shadowmount/autotune.ini"
 #define ACTIVITY_MAX 128
+#define ACTIVITY_LOG_LIMIT_DEFAULT 80
+#define ACTIVITY_LOG_LIMIT_MAX 200
 #define ACTIVITY_HEARTBEAT_TIMEOUT 20
 #define ACTIVITY_RUNNING_START_TIMEOUT 300
 #define ACTIVITY_NAME_MAX 256
@@ -141,6 +146,23 @@ path_is_safe(const char *p) {
   if(p[0] != '/') return 0;
   if(strstr(p, "..")) return 0;
   return 1;
+}
+
+
+static int
+path_has_dir_prefix(const char *path, const char *prefix) {
+  size_t n;
+  if(!path || !prefix) return 0;
+  n = strlen(prefix);
+  return strncmp(path, prefix, n) == 0 &&
+         (path[n] == 0 || path[n] == '/');
+}
+
+
+static int
+app_convert_path_forbidden(const char *path) {
+  return path_has_dir_prefix(path, "/mnt/shadowmnt") ||
+         path_has_dir_prefix(path, "/system_ex");
 }
 
 
@@ -272,11 +294,13 @@ operation_result_name(int rc, const char *err) {
 
 
 static void
-operation_log_write_at(const char *path, const char *result, const char *verb,
-                       const char *target, const char *err,
-                       time_t started_at, time_t ended_at, long total_bytes,
-                       long copied_bytes, int total_files, int done_files,
-                       int failed_files, const char *current) {
+operation_log_write_at_extra(const char *path, const char *result, const char *verb,
+                             const char *target, const char *err,
+                             time_t started_at, time_t ended_at,
+                             long total_bytes, long copied_bytes,
+                             int total_files, int done_files,
+                             int failed_files, const char *current,
+                             const char *extra) {
   if(!path || !*path) return;
   if(!started_at) started_at = ended_at ? ended_at : time(NULL);
   if(!ended_at) ended_at = time(NULL);
@@ -298,7 +322,25 @@ operation_log_write_at(const char *path, const char *result, const char *verb,
           !strcmp(result ? result : "", "success") ? "none" :
           (err && *err ? err : "failed"));
   fprintf(f, "Current: %s\n", current && *current ? current : "-");
+  if(extra && *extra) {
+    fputs(extra, f);
+    size_t n = strlen(extra);
+    if(n == 0 || extra[n - 1] != '\n') fputc('\n', f);
+  }
   fclose(f);
+}
+
+
+static void
+operation_log_write_at(const char *path, const char *result, const char *verb,
+                       const char *target, const char *err,
+                       time_t started_at, time_t ended_at, long total_bytes,
+                       long copied_bytes, int total_files, int done_files,
+                       int failed_files, const char *current) {
+  operation_log_write_at_extra(path, result, verb, target, err, started_at,
+                               ended_at, total_bytes, copied_bytes,
+                               total_files, done_files, failed_files, current,
+                               NULL);
 }
 
 
@@ -376,6 +418,146 @@ read_log_field(const char *path, const char *prefix, char *out,
 }
 
 
+typedef struct log_summary {
+  long started_at;
+  long ended_at;
+  long copied_bytes;
+  long total_bytes;
+  int done_items;
+  int total_items;
+  int failed_items;
+} log_summary_t;
+
+
+typedef struct activity_log_candidate {
+  char name[256];
+  struct stat st;
+} activity_log_candidate_t;
+
+
+static long
+parse_log_long_value(const char *value, long fallback) {
+  if(!value || !*value) return fallback;
+  errno = 0;
+  char *end = NULL;
+  long parsed = strtol(value, &end, 10);
+  if(end == value || errno == ERANGE) return fallback;
+  return parsed;
+}
+
+
+static int
+clamp_log_int(long value) {
+  if(value <= 0) return 0;
+  if(value > INT_MAX) return INT_MAX;
+  return (int)value;
+}
+
+
+static void
+parse_log_pair_value(const char *value, long *left, long *right) {
+  if(!value || !left || !right) return;
+  errno = 0;
+  char *end = NULL;
+  long parsed_left = strtol(value, &end, 10);
+  if(end == value || errno == ERANGE) return;
+  while(*end && isspace((unsigned char)*end)) end++;
+  if(*end != '/') return;
+  end++;
+  while(*end && isspace((unsigned char)*end)) end++;
+  errno = 0;
+  char *end_right = NULL;
+  long parsed_right = strtol(end, &end_right, 10);
+  if(end_right == end || errno == ERANGE) return;
+  *left = parsed_left < 0 ? 0 : parsed_left;
+  *right = parsed_right < 0 ? 0 : parsed_right;
+}
+
+
+static void
+read_log_summary(const char *path, log_summary_t *summary) {
+  if(!summary) return;
+  memset(summary, 0, sizeof(*summary));
+  char value[96];
+  if(read_log_field(path, "Started: ", value, sizeof(value)) == 0) {
+    summary->started_at = parse_log_long_value(value, 0);
+  }
+  if(read_log_field(path, "Ended: ", value, sizeof(value)) == 0) {
+    summary->ended_at = parse_log_long_value(value, 0);
+  }
+  if(read_log_field(path, "Bytes: ", value, sizeof(value)) == 0) {
+    parse_log_pair_value(value, &summary->copied_bytes, &summary->total_bytes);
+  }
+  if(read_log_field(path, "Items: ", value, sizeof(value)) == 0) {
+    long done = 0, total = 0;
+    parse_log_pair_value(value, &done, &total);
+    summary->done_items = clamp_log_int(done);
+    summary->total_items = clamp_log_int(total);
+  }
+  if(read_log_field(path, "FailedItems: ", value, sizeof(value)) == 0) {
+    summary->failed_items = clamp_log_int(parse_log_long_value(value, 0));
+  }
+}
+
+
+static int
+query_arg_truthy(const http_request_t *req, const char *name, int fallback) {
+  char value[32];
+  if(!websrv_get_query_arg(req, name, value, sizeof(value))) return fallback;
+  if(!strcasecmp(value, "0") || !strcasecmp(value, "false") ||
+     !strcasecmp(value, "no") || !strcasecmp(value, "off")) {
+    return 0;
+  }
+  return 1;
+}
+
+
+static int
+parse_int_query_arg(const http_request_t *req, const char *name, int fallback,
+                    int min_value, int max_value) {
+  char value[32];
+  if(!websrv_get_query_arg(req, name, value, sizeof(value))) return fallback;
+  errno = 0;
+  char *end = NULL;
+  long parsed = strtol(value, &end, 10);
+  if(end == value || errno == ERANGE) return fallback;
+  if(parsed < min_value) return min_value;
+  if(parsed > max_value) return max_value;
+  return (int)parsed;
+}
+
+
+static int
+activity_log_candidate_newer(const activity_log_candidate_t *a,
+                             const activity_log_candidate_t *b) {
+  if(a->st.st_mtime != b->st.st_mtime) return a->st.st_mtime > b->st.st_mtime;
+  return strcmp(a->name, b->name) > 0;
+}
+
+
+static int
+activity_log_candidate_cmp_desc(const void *ap, const void *bp) {
+  const activity_log_candidate_t *a = (const activity_log_candidate_t *)ap;
+  const activity_log_candidate_t *b = (const activity_log_candidate_t *)bp;
+  if(activity_log_candidate_newer(a, b)) return -1;
+  if(activity_log_candidate_newer(b, a)) return 1;
+  return 0;
+}
+
+
+static int
+activity_log_candidate_oldest_index(const activity_log_candidate_t *items,
+                                    int count) {
+  int oldest = 0;
+  for(int i = 1; i < count; i++) {
+    if(activity_log_candidate_newer(&items[oldest], &items[i])) {
+      oldest = i;
+    }
+  }
+  return oldest;
+}
+
+
 void
 join_path(char *out, size_t out_sz, const char *dir, const char *name) {
   size_t n = strlen(dir);
@@ -388,6 +570,124 @@ const char *
 path_basename(const char *path) {
   const char *base = strrchr(path ? path : "", '/');
   return base && base[1] ? base + 1 : path;
+}
+
+
+static char *
+trim_ascii_inplace(char *s) {
+  if(!s) return s;
+  while(*s && isspace((unsigned char)*s)) s++;
+  char *end = s + strlen(s);
+  while(end > s && isspace((unsigned char)end[-1])) *--end = 0;
+  return s;
+}
+
+
+static int
+shadowmount_image_filename_safe(const char *name) {
+  if(!name || !*name || strlen(name) >= 512) return 0;
+  for(const unsigned char *p = (const unsigned char *)name; *p; p++) {
+    if(*p < 0x20 || *p == ':' || *p == '/' || *p == '\\') return 0;
+  }
+  return 1;
+}
+
+
+static int
+shadowmount_line_matches_image_sector(const char *line, const char *filename) {
+  char local[1024];
+  char *eq, *key, *value, *sep, *rule_name;
+  if(!line || !filename) return 0;
+  snprintf(local, sizeof(local), "%s", line);
+  key = trim_ascii_inplace(local);
+  if(!*key || *key == '#' || *key == ';') return 0;
+  eq = strchr(key, '=');
+  if(!eq) return 0;
+  *eq = 0;
+  value = trim_ascii_inplace(eq + 1);
+  key = trim_ascii_inplace(key);
+  if(strcasecmp(key, "image_sector")) return 0;
+  sep = strrchr(value, ':');
+  if(!sep) return 0;
+  *sep = 0;
+  rule_name = trim_ascii_inplace(value);
+  return strcasecmp(rule_name, filename) == 0;
+}
+
+
+static int
+shadowmount_remove_image_sector(const char *image_path, char *configured_name,
+                                size_t configured_name_size, int *removed,
+                                char *err, size_t err_size) {
+  const char *base = path_basename(image_path);
+  char temp_path[1024];
+  FILE *in = NULL;
+  FILE *out = NULL;
+  int found = 0;
+  int rc = -1;
+
+  if(configured_name && configured_name_size > 0) configured_name[0] = 0;
+  if(removed) *removed = 0;
+  if(!shadowmount_image_filename_safe(base)) {
+    snprintf(err, err_size, "bad ShadowMount image filename");
+    errno = EINVAL;
+    return -1;
+  }
+  if(configured_name && configured_name_size > 0) {
+    snprintf(configured_name, configured_name_size, "%s", base);
+  }
+  if(snprintf(temp_path, sizeof(temp_path), "%s.tmp",
+              SHADOWMOUNT_AUTOTUNE_FILE) >= (int)sizeof(temp_path)) {
+    snprintf(err, err_size, "ShadowMount autotune path too long");
+    errno = ENAMETOOLONG;
+    return -1;
+  }
+
+  in = fopen(SHADOWMOUNT_AUTOTUNE_FILE, "r");
+  if(!in) {
+    if(errno == ENOENT) return 0;
+    snprintf(err, err_size, "open ShadowMount autotune: %s", strerror(errno));
+    return -1;
+  }
+  out = fopen(temp_path, "w");
+  if(!out) {
+    snprintf(err, err_size, "open ShadowMount autotune temp: %s", strerror(errno));
+    fclose(in);
+    return -1;
+  }
+
+  char line[1024];
+  while(fgets(line, sizeof(line), in)) {
+    if(shadowmount_line_matches_image_sector(line, base)) {
+      found = 1;
+      continue;
+    }
+    if(fputs(line, out) == EOF) {
+      snprintf(err, err_size, "write ShadowMount autotune: %s",
+               strerror(errno));
+      goto done;
+    }
+  }
+
+  if(fclose(out) != 0) {
+    out = NULL;
+    snprintf(err, err_size, "close ShadowMount autotune: %s", strerror(errno));
+    goto done;
+  }
+  out = NULL;
+  if(rename(temp_path, SHADOWMOUNT_AUTOTUNE_FILE) != 0) {
+    snprintf(err, err_size, "replace ShadowMount autotune: %s",
+             strerror(errno));
+    goto done;
+  }
+  if(removed) *removed = found;
+  rc = 0;
+
+done:
+  if(in) fclose(in);
+  if(out) fclose(out);
+  if(rc != 0) unlink(temp_path);
+  return rc;
 }
 
 
@@ -472,6 +772,13 @@ job_begin(const char *verb) {
   atomic_store(&g_job.cancel, 0);
   atomic_store(&g_job.total_bytes, 0);
   atomic_store(&g_job.copied_bytes, 0);
+  atomic_store(&g_job.compressed_output_bytes, 0);
+  atomic_store(&g_job.raw_blocks, 0);
+  atomic_store(&g_job.compressed_blocks, 0);
+  atomic_store(&g_job.skipped_zlib_blocks, 0);
+  atomic_store(&g_job.total_blocks, 0);
+  atomic_store(&g_job.writer_wait_us, 0);
+  atomic_store(&g_job.worker_wait_us, 0);
   atomic_store(&g_job.total_files, 0);
   atomic_store(&g_job.done_files, 0);
   atomic_store(&g_job.failed_files, 0);
@@ -489,8 +796,8 @@ job_begin(const char *verb) {
 }
 
 
-void
-job_end(int rc, const char *err) {
+static void
+job_end_with_extra(int rc, const char *err, const char *extra) {
   char verb[16], current[512], target[1024], final_err[256], log_path[1024];
   time_t started_at, ended_at;
   long total_bytes = atomic_load(&g_job.total_bytes);
@@ -513,16 +820,32 @@ job_end(int rc, const char *err) {
   ended_at = g_job.ended_at;
   pthread_mutex_unlock(&g_job.lock);
   if(log_path[0]) {
-    operation_log_write_at(log_path, operation_result_name(rc, final_err), verb,
-                           target, final_err, started_at, ended_at,
-                           total_bytes, copied_bytes, total_files, done_files,
-                           failed_files, current);
+    operation_log_write_at_extra(log_path, operation_result_name(rc, final_err),
+                                 verb, target, final_err, started_at,
+                                 ended_at, total_bytes, copied_bytes,
+                                 total_files, done_files, failed_files,
+                                 current, extra);
   } else {
-    operation_log_write(verb, target, rc, final_err, started_at, ended_at,
-                        total_bytes, copied_bytes, total_files, done_files,
-                        failed_files, current);
+    char path[1024];
+    if(operation_log_make_path(path, sizeof(path), verb, ended_at) == 0) {
+      operation_log_write_at_extra(path, operation_result_name(rc, final_err),
+                                   verb, target, final_err, started_at,
+                                   ended_at, total_bytes, copied_bytes,
+                                   total_files, done_files, failed_files,
+                                   current, extra);
+    } else {
+      operation_log_write(verb, target, rc, final_err, started_at, ended_at,
+                          total_bytes, copied_bytes, total_files, done_files,
+                          failed_files, current);
+    }
   }
   atomic_store(&g_job.busy, 0);
+}
+
+
+void
+job_end(int rc, const char *err) {
+  job_end_with_extra(rc, err, NULL);
 }
 
 
@@ -747,6 +1070,31 @@ activity_finish_queue(const char *queue_id, int rc, const char *err,
 }
 
 
+void
+activity_defer_queue_success(const char *queue_id, const char *target,
+                             long copied_bytes, int done_items,
+                             const char *log_name) {
+  if(!queue_id || !*queue_id) return;
+  pthread_mutex_lock(&g_activity.lock);
+  activity_item_t *item = activity_find_locked(queue_id);
+  if(item && item->status == ACT_STATUS_RUNNING) {
+    time_t now = time(NULL);
+    if(target && *target) {
+      snprintf(item->dest_path, sizeof(item->dest_path), "%s", target);
+    }
+    if(copied_bytes >= 0) item->copied_bytes = copied_bytes;
+    if(done_items >= 0) item->done_items = done_items;
+    item->failed_items = 0;
+    item->error[0] = 0;
+    if(log_name && *log_name) {
+      snprintf(item->log_name, sizeof(item->log_name), "%s", log_name);
+    }
+    item->updated_at = item->heartbeat_at = now;
+  }
+  pthread_mutex_unlock(&g_activity.lock);
+}
+
+
 static int
 activity_terminal_ok_response(const http_request_t *req) {
   json_buf_t b = {0};
@@ -821,6 +1169,7 @@ typedef struct bg_file_op {
   char   target[1024];
   char   current[512];
   char   error[256];
+  char   extra[2048];
   char   log_path[1024];
   int    is_move;
   long   total_bytes;
@@ -829,6 +1178,7 @@ typedef struct bg_file_op {
   int    done_files;
   int    failed_files;
   time_t started_at;
+  time_t last_log_at;
 } bg_file_op_t;
 
 
@@ -859,12 +1209,23 @@ bg_file_op_target(const bg_file_op_t *op) {
 
 
 static void
-bg_file_op_write_running(bg_file_op_t *op) {
+bg_file_op_write_progress(bg_file_op_t *op, int force) {
+  time_t now = time(NULL);
   if(!op) return;
+  if(!force && op->last_log_at > 0 && now - op->last_log_at < 2) return;
+  op->last_log_at = now;
   operation_log_write_at(op->log_path, "running", op->verb,
                          bg_file_op_target(op), "operation still running",
-                         op->started_at, op->started_at, 0, 0, 0, 0, 0,
-                         bg_file_op_target(op));
+                         op->started_at, now, op->total_bytes,
+                         op->copied_bytes, op->total_files, op->done_files,
+                         op->failed_files,
+                         op->current[0] ? op->current : bg_file_op_target(op));
+}
+
+
+static void
+bg_file_op_write_running(bg_file_op_t *op) {
+  bg_file_op_write_progress(op, 1);
 }
 
 
@@ -873,14 +1234,16 @@ bg_file_op_finish(bg_file_op_t *op, int rc) {
   time_t ended_at = time(NULL);
   if(!op) return;
   if(rc != 0 && op->failed_files <= 0) op->failed_files = 1;
-  operation_log_write_at(op->log_path, rc == 0 ? "success" : "failed",
-                         op->verb, bg_file_op_target(op),
-                         rc == 0 ? NULL :
-                           (op->error[0] ? op->error : "operation failed"),
-                         op->started_at, ended_at, op->total_bytes,
-                         op->copied_bytes, op->total_files, op->done_files,
-                         op->failed_files,
-                         op->current[0] ? op->current : bg_file_op_target(op));
+  operation_log_write_at_extra(op->log_path, rc == 0 ? "success" : "failed",
+                               op->verb, bg_file_op_target(op),
+                               rc == 0 ? NULL :
+                                 (op->error[0] ? op->error : "operation failed"),
+                               op->started_at, ended_at, op->total_bytes,
+                               op->copied_bytes, op->total_files,
+                               op->done_files, op->failed_files,
+                               op->current[0] ? op->current :
+                                 bg_file_op_target(op),
+                               op->extra);
 }
 
 
@@ -910,6 +1273,442 @@ size_walker(const char *path, long *items, long *bytes, int count_dirs) {
     (*items)++;
     if(st.st_size > 0) *bytes += (long)st.st_size;
   }
+}
+
+
+typedef struct sha256_ctx {
+  uint32_t state[8];
+  uint64_t bitlen;
+  uint8_t  data[64];
+  size_t   datalen;
+} sha256_ctx_t;
+
+
+static uint32_t
+sha256_rotr(uint32_t value, uint32_t bits) {
+  return (value >> bits) | (value << (32 - bits));
+}
+
+
+static uint32_t
+sha256_load_be32(const uint8_t *p) {
+  return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+         ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+
+static void
+sha256_store_be32(uint8_t *p, uint32_t value) {
+  p[0] = (uint8_t)(value >> 24);
+  p[1] = (uint8_t)(value >> 16);
+  p[2] = (uint8_t)(value >> 8);
+  p[3] = (uint8_t)value;
+}
+
+
+static const uint32_t sha256_k[64] = {
+  0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U,
+  0x3956c25bU, 0x59f111f1U, 0x923f82a4U, 0xab1c5ed5U,
+  0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U,
+  0x72be5d74U, 0x80deb1feU, 0x9bdc06a7U, 0xc19bf174U,
+  0xe49b69c1U, 0xefbe4786U, 0x0fc19dc6U, 0x240ca1ccU,
+  0x2de92c6fU, 0x4a7484aaU, 0x5cb0a9dcU, 0x76f988daU,
+  0x983e5152U, 0xa831c66dU, 0xb00327c8U, 0xbf597fc7U,
+  0xc6e00bf3U, 0xd5a79147U, 0x06ca6351U, 0x14292967U,
+  0x27b70a85U, 0x2e1b2138U, 0x4d2c6dfcU, 0x53380d13U,
+  0x650a7354U, 0x766a0abbU, 0x81c2c92eU, 0x92722c85U,
+  0xa2bfe8a1U, 0xa81a664bU, 0xc24b8b70U, 0xc76c51a3U,
+  0xd192e819U, 0xd6990624U, 0xf40e3585U, 0x106aa070U,
+  0x19a4c116U, 0x1e376c08U, 0x2748774cU, 0x34b0bcb5U,
+  0x391c0cb3U, 0x4ed8aa4aU, 0x5b9cca4fU, 0x682e6ff3U,
+  0x748f82eeU, 0x78a5636fU, 0x84c87814U, 0x8cc70208U,
+  0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U
+};
+
+
+static void
+sha256_transform(sha256_ctx_t *ctx, const uint8_t data[64]) {
+  uint32_t m[64];
+  for(int i = 0; i < 16; i++) {
+    m[i] = sha256_load_be32(data + (i * 4));
+  }
+  for(int i = 16; i < 64; i++) {
+    uint32_t s0 = sha256_rotr(m[i - 15], 7) ^
+                  sha256_rotr(m[i - 15], 18) ^ (m[i - 15] >> 3);
+    uint32_t s1 = sha256_rotr(m[i - 2], 17) ^
+                  sha256_rotr(m[i - 2], 19) ^ (m[i - 2] >> 10);
+    m[i] = m[i - 16] + s0 + m[i - 7] + s1;
+  }
+
+  uint32_t a = ctx->state[0];
+  uint32_t b = ctx->state[1];
+  uint32_t c = ctx->state[2];
+  uint32_t d = ctx->state[3];
+  uint32_t e = ctx->state[4];
+  uint32_t f = ctx->state[5];
+  uint32_t g = ctx->state[6];
+  uint32_t h = ctx->state[7];
+
+  for(int i = 0; i < 64; i++) {
+    uint32_t s1 = sha256_rotr(e, 6) ^ sha256_rotr(e, 11) ^
+                  sha256_rotr(e, 25);
+    uint32_t ch = (e & f) ^ ((~e) & g);
+    uint32_t temp1 = h + s1 + ch + sha256_k[i] + m[i];
+    uint32_t s0 = sha256_rotr(a, 2) ^ sha256_rotr(a, 13) ^
+                  sha256_rotr(a, 22);
+    uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+    uint32_t temp2 = s0 + maj;
+    h = g;
+    g = f;
+    f = e;
+    e = d + temp1;
+    d = c;
+    c = b;
+    b = a;
+    a = temp1 + temp2;
+  }
+
+  ctx->state[0] += a;
+  ctx->state[1] += b;
+  ctx->state[2] += c;
+  ctx->state[3] += d;
+  ctx->state[4] += e;
+  ctx->state[5] += f;
+  ctx->state[6] += g;
+  ctx->state[7] += h;
+}
+
+
+static void
+sha256_init(sha256_ctx_t *ctx) {
+  ctx->datalen = 0;
+  ctx->bitlen = 0;
+  ctx->state[0] = 0x6a09e667U;
+  ctx->state[1] = 0xbb67ae85U;
+  ctx->state[2] = 0x3c6ef372U;
+  ctx->state[3] = 0xa54ff53aU;
+  ctx->state[4] = 0x510e527fU;
+  ctx->state[5] = 0x9b05688cU;
+  ctx->state[6] = 0x1f83d9abU;
+  ctx->state[7] = 0x5be0cd19U;
+}
+
+
+static void
+sha256_update(sha256_ctx_t *ctx, const void *data, size_t len) {
+  const uint8_t *bytes = data;
+  for(size_t i = 0; i < len; i++) {
+    ctx->data[ctx->datalen++] = bytes[i];
+    if(ctx->datalen == sizeof(ctx->data)) {
+      sha256_transform(ctx, ctx->data);
+      ctx->bitlen += 512;
+      ctx->datalen = 0;
+    }
+  }
+}
+
+
+static void
+sha256_final(sha256_ctx_t *ctx, uint8_t hash[32]) {
+  size_t i = ctx->datalen;
+  ctx->data[i++] = 0x80;
+  if(i > 56) {
+    while(i < sizeof(ctx->data)) ctx->data[i++] = 0;
+    sha256_transform(ctx, ctx->data);
+    i = 0;
+  }
+  while(i < 56) ctx->data[i++] = 0;
+
+  ctx->bitlen += (uint64_t)ctx->datalen * 8;
+  for(int j = 0; j < 8; j++) {
+    ctx->data[63 - j] = (uint8_t)(ctx->bitlen >> (j * 8));
+  }
+  sha256_transform(ctx, ctx->data);
+
+  for(int j = 0; j < 8; j++) {
+    sha256_store_be32(hash + (j * 4), ctx->state[j]);
+  }
+}
+
+
+static void
+sha256_hex(const uint8_t hash[32], char out[65]) {
+  static const char hex[] = "0123456789abcdef";
+  for(int i = 0; i < 32; i++) {
+    out[i * 2] = hex[hash[i] >> 4];
+    out[i * 2 + 1] = hex[hash[i] & 0xf];
+  }
+  out[64] = 0;
+}
+
+
+static void
+checksum_update_cstr(sha256_ctx_t *ctx, const char *s) {
+  static const uint8_t zero = 0;
+  if(s && *s) sha256_update(ctx, s, strlen(s));
+  sha256_update(ctx, &zero, 1);
+}
+
+
+static void
+checksum_update_u64_le(sha256_ctx_t *ctx, uint64_t value) {
+  uint8_t data[8];
+  for(int i = 0; i < 8; i++) {
+    data[i] = (uint8_t)(value >> (i * 8));
+  }
+  sha256_update(ctx, data, sizeof(data));
+}
+
+
+typedef struct checksum_entry {
+  char name[256];
+} checksum_entry_t;
+
+
+static int
+checksum_ascii_tolower(int ch) {
+  return ch >= 'A' && ch <= 'Z' ? ch + 32 : ch;
+}
+
+
+static int
+checksum_name_cmp(const void *a, const void *b) {
+  const checksum_entry_t *ea = a;
+  const checksum_entry_t *eb = b;
+  const unsigned char *pa = (const unsigned char *)ea->name;
+  const unsigned char *pb = (const unsigned char *)eb->name;
+  while(*pa || *pb) {
+    int ca = checksum_ascii_tolower(*pa);
+    int cb = checksum_ascii_tolower(*pb);
+    if(ca != cb) return ca - cb;
+    if(*pa) pa++;
+    if(*pb) pb++;
+  }
+  return strcmp(ea->name, eb->name);
+}
+
+
+static int
+checksum_push_entry(checksum_entry_t **entries, size_t *count, size_t *cap,
+                    const char *name, bg_file_op_t *op) {
+  if(strlen(name) >= sizeof((*entries)[0].name)) {
+    bg_file_op_error(op, "name too long: %s", name);
+    return -1;
+  }
+  if(*count == *cap) {
+    size_t next = *cap ? *cap * 2 : 64;
+    checksum_entry_t *p = realloc(*entries, next * sizeof(*p));
+    if(!p) {
+      bg_file_op_error(op, "out of memory");
+      return -1;
+    }
+    *entries = p;
+    *cap = next;
+  }
+  snprintf((*entries)[*count].name, sizeof((*entries)[*count].name), "%s", name);
+  (*count)++;
+  return 0;
+}
+
+
+static int
+checksum_join_rel(char *out, size_t out_size, const char *parent,
+                  const char *name) {
+  int n;
+  if(parent && *parent) {
+    n = snprintf(out, out_size, "%s/%s", parent, name);
+  } else {
+    n = snprintf(out, out_size, "%s", name);
+  }
+  return n >= 0 && (size_t)n < out_size ? 0 : -1;
+}
+
+
+static int
+checksum_hash_file(bg_file_op_t *op, sha256_ctx_t *app_ctx, const char *path,
+                   const char *rel, const struct stat *st) {
+  int fd = open(path, O_RDONLY);
+  if(fd < 0) {
+    bg_file_op_error(op, "open(%s): %s", path, strerror(errno));
+    return -1;
+  }
+
+  uint8_t *buf = malloc(COPY_BUF_SIZE);
+  if(!buf) {
+    close(fd);
+    bg_file_op_error(op, "out of memory");
+    return -1;
+  }
+
+  sha256_ctx_t file_ctx;
+  sha256_init(&file_ctx);
+  uint64_t file_bytes = 0;
+  bg_file_op_current(op, rel);
+
+  for(;;) {
+    ssize_t n = read(fd, buf, COPY_BUF_SIZE);
+    if(n < 0) {
+      if(errno == EINTR) continue;
+      bg_file_op_error(op, "read(%s): %s", path, strerror(errno));
+      free(buf);
+      close(fd);
+      return -1;
+    }
+    if(n == 0) break;
+    sha256_update(&file_ctx, buf, (size_t)n);
+    file_bytes += (uint64_t)n;
+    if(op) op->copied_bytes += (long)n;
+    bg_file_op_write_progress(op, 0);
+  }
+
+  free(buf);
+  if(close(fd) != 0) {
+    bg_file_op_error(op, "close(%s): %s", path, strerror(errno));
+    return -1;
+  }
+
+  if(st && S_ISREG(st->st_mode) && file_bytes != (uint64_t)st->st_size) {
+    bg_file_op_error(op, "file changed while hashing: %s", path);
+    return -1;
+  }
+
+  uint8_t file_hash[32];
+  sha256_final(&file_ctx, file_hash);
+
+  checksum_update_cstr(app_ctx, "F");
+  checksum_update_cstr(app_ctx, rel);
+  checksum_update_u64_le(app_ctx, file_bytes);
+  sha256_update(app_ctx, file_hash, sizeof(file_hash));
+
+  if(op) op->done_files++;
+  bg_file_op_write_progress(op, 1);
+  return 0;
+}
+
+
+static int
+checksum_walk_dir(bg_file_op_t *op, sha256_ctx_t *app_ctx, const char *path,
+                  const char *rel_parent) {
+  DIR *d = opendir(path);
+  if(!d) {
+    bg_file_op_error(op, "opendir(%s): %s", path, strerror(errno));
+    return -1;
+  }
+
+  checksum_entry_t *entries = NULL;
+  size_t count = 0, cap = 0;
+  struct dirent *ent;
+  int rc = 0;
+  while((ent = readdir(d))) {
+    if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+    if(checksum_push_entry(&entries, &count, &cap, ent->d_name, op) != 0) {
+      rc = -1;
+      break;
+    }
+  }
+  closedir(d);
+  if(rc != 0) {
+    free(entries);
+    return -1;
+  }
+
+  qsort(entries, count, sizeof(entries[0]), checksum_name_cmp);
+  for(size_t i = 0; i < count; i++) {
+    char child[1024];
+    char rel[1024];
+    if(strlen(path) + strlen(entries[i].name) + 2 >= sizeof(child) ||
+       checksum_join_rel(rel, sizeof(rel), rel_parent, entries[i].name) != 0) {
+      bg_file_op_error(op, "path too long: %s/%s", path, entries[i].name);
+      rc = -1;
+      break;
+    }
+    join_path(child, sizeof(child), path, entries[i].name);
+
+    struct stat st;
+    if(lstat(child, &st) != 0) {
+      bg_file_op_error(op, "stat(%s): %s", child, strerror(errno));
+      rc = -1;
+      break;
+    }
+
+    if(S_ISDIR(st.st_mode)) {
+      checksum_update_cstr(app_ctx, "D");
+      checksum_update_cstr(app_ctx, rel);
+      bg_file_op_current(op, rel);
+      bg_file_op_write_progress(op, 0);
+      if(checksum_walk_dir(op, app_ctx, child, rel) != 0) {
+        rc = -1;
+        break;
+      }
+    } else if(S_ISREG(st.st_mode)) {
+      if(checksum_hash_file(op, app_ctx, child, rel, &st) != 0) {
+        rc = -1;
+        break;
+      }
+    } else {
+      bg_file_op_error(op, "unsupported entry type: %s", child);
+      rc = -1;
+      break;
+    }
+  }
+
+  free(entries);
+  return rc;
+}
+
+
+static void *
+checksum_worker(void *arg) {
+  bg_file_op_t *a = arg;
+  long files = 0, bytes = 0;
+  struct stat st;
+  int rc = -1;
+
+  if(lstat(a->src, &st) != 0) {
+    bg_file_op_error(a, "source not found");
+    goto done;
+  }
+  if(!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) {
+    bg_file_op_error(a, "checksum needs a folder or file");
+    goto done;
+  }
+
+  bg_file_op_current(a, "Scanning checksum target");
+  size_walker(a->src, &files, &bytes, 0);
+  a->total_files = files > INT_MAX ? INT_MAX : (int)files;
+  a->total_bytes = bytes;
+  bg_file_op_current(a, "Hashing");
+  bg_file_op_write_progress(a, 1);
+
+  sha256_ctx_t app_ctx;
+  sha256_init(&app_ctx);
+  checksum_update_cstr(&app_ctx, "BFpilot app checksum v1");
+
+  if(S_ISDIR(st.st_mode)) {
+    rc = checksum_walk_dir(a, &app_ctx, a->src, "");
+  } else {
+    rc = checksum_hash_file(a, &app_ctx, a->src, path_basename(a->src), &st);
+  }
+  if(rc != 0) goto done;
+
+  uint8_t digest[32];
+  char hex[65];
+  sha256_final(&app_ctx, digest);
+  sha256_hex(digest, hex);
+  snprintf(a->extra, sizeof(a->extra),
+           "ChecksumAlgorithm: SHA-256\n"
+           "ChecksumScope: BFpilot app-manifest-v1\n"
+           "Checksum: %s\n"
+           "ChecksumFiles: %d\n"
+           "ChecksumBytes: %ld\n",
+           hex, a->done_files, a->copied_bytes);
+  bg_file_op_current(a, "Checksum complete");
+  rc = 0;
+
+done:
+  bg_file_op_finish(a, rc);
+  free(a);
+  return NULL;
 }
 
 
@@ -1201,6 +2000,342 @@ done:
   return NULL;
 }
 
+typedef struct app_compress_op {
+  char path[1024];
+  int  overwrite;
+  int  workers;
+  int  format;
+  int  delete_policy;
+} app_compress_op_t;
+
+typedef struct app_decompress_op {
+  char path[1024];
+  int  overwrite;
+  int  workers;
+  int  delete_policy;
+} app_decompress_op_t;
+
+typedef struct app_prepare_op {
+  char path[1024];
+} app_prepare_op_t;
+
+static const char *
+app_compress_format_name(int format) {
+  return format == PFS_COMPRESS_FORMAT_EXFAT ? "exfat" : "pfs";
+}
+
+static const char *
+app_delete_policy_name(int policy) {
+  if(policy == PFS_DELETE_AFTER) return "after";
+  if(policy == PFS_DELETE_STREAM) return "stream";
+  return "keep";
+}
+
+static const char *
+app_nested_type_name(int nested_type) {
+  if(nested_type == PFS_NESTED_PFS) return "pfs";
+  if(nested_type == PFS_NESTED_EXFAT) return "exfat";
+  return "unknown";
+}
+
+
+static void *
+app_compress_worker(void *arg) {
+  app_compress_op_t *a = arg;
+  pfs_app_info_t info;
+  char err[256] = {0};
+  char extra[1024] = {0};
+  snprintf(extra, sizeof(extra),
+           "Format: %s\n"
+           "DeletePolicy: %s\n",
+           app_compress_format_name(a->format),
+           app_delete_policy_name(a->delete_policy));
+  if(a->delete_policy == PFS_DELETE_STREAM) {
+    snprintf(extra, sizeof(extra),
+             "Format: %s\n"
+             "DeletePolicy: %s\n"
+             "ConvertMode: destructive-stream\n"
+             "ConvertWarning: no rollback\n",
+             app_compress_format_name(a->format),
+             app_delete_policy_name(a->delete_policy));
+  } else if(a->delete_policy == PFS_DELETE_AFTER) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "ConvertMode: delete-after-success\n");
+  }
+  int rc = pfs_compress_app_to_ffpfsc_opts(a->path, a->overwrite, a->workers,
+                                           a->format, a->delete_policy,
+                                           &info, err, sizeof(err));
+  if(rc == 0) {
+    job_set_target(info.output_path);
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "Output: %s\n"
+             "NestedImage: %s\n",
+             info.output_path, info.nested_name);
+  }
+  job_end_with_extra(rc, rc == 0 ? NULL : (err[0] ? err : "compress failed"),
+                     extra[0] ? extra : NULL);
+  free(a);
+  return NULL;
+}
+
+
+static void *
+app_decompress_worker(void *arg) {
+  app_decompress_op_t *a = arg;
+  pfs_decompress_info_t info;
+  char err[256] = {0};
+  char extra[1024] = {0};
+  snprintf(extra, sizeof(extra),
+           "DeletePolicy: %s\n",
+           app_delete_policy_name(a->delete_policy));
+  if(a->delete_policy == PFS_DELETE_STREAM) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "ConvertMode: destructive-stream\n"
+             "ConvertWarning: no rollback\n");
+  } else if(a->delete_policy == PFS_DELETE_AFTER) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "ConvertMode: delete-after-success\n");
+  }
+  int rc = pfs_decompress_ffpfsc_to_app_opts(a->path, a->overwrite, a->workers,
+                                             a->delete_policy, &info,
+                                             err, sizeof(err));
+  if(rc == 0) {
+    size_t used = strlen(extra);
+    snprintf(extra + used, sizeof(extra) - used,
+             "Output: %s\n"
+             "NestedImage: %s\n"
+             "NestedType: %s\n",
+             info.output_path, info.nested_name,
+             app_nested_type_name(info.nested_type));
+  }
+  if(rc == 0 && a->delete_policy != PFS_DELETE_KEEP) {
+    char sm_name[512] = {0};
+    char sm_err[256] = {0};
+    int removed = 0;
+    if(shadowmount_remove_image_sector(info.source_path, sm_name,
+          sizeof(sm_name), &removed, sm_err, sizeof(sm_err)) != 0) {
+      snprintf(err, sizeof(err), "decompressed, but ShadowMountPlus cleanup failed: %s",
+               sm_err[0] ? sm_err : strerror(errno));
+      rc = -1;
+    } else {
+      size_t used = strlen(extra);
+      snprintf(extra + used, sizeof(extra) - used,
+               "ShadowMountAutotune: %s\n"
+               "ShadowMountImage: %s\n"
+               "ShadowMountAction: removed\n"
+               "ShadowMountRemoved: %s\n",
+               SHADOWMOUNT_AUTOTUNE_FILE, sm_name,
+               removed ? "yes" : "no");
+      job_set_current(removed ? "ShadowMountPlus entry removed" :
+                                "ShadowMountPlus entry already clean");
+    }
+    if(rc == 0 && info.nested_type == PFS_NESTED_EXFAT &&
+       info.nested_name[0]) {
+      char nested_sm_name[512] = {0};
+      int nested_removed = 0;
+      if(shadowmount_remove_image_sector(info.nested_name, nested_sm_name,
+            sizeof(nested_sm_name), &nested_removed, sm_err,
+            sizeof(sm_err)) != 0) {
+        snprintf(err, sizeof(err), "decompressed, but nested exFAT ShadowMountPlus cleanup failed: %s",
+                 sm_err[0] ? sm_err : strerror(errno));
+        rc = -1;
+      } else {
+        size_t used = strlen(extra);
+        snprintf(extra + used, sizeof(extra) - used,
+                 "ShadowMountNestedImage: %s\n"
+                 "ShadowMountNestedAction: removed\n"
+                 "ShadowMountNestedRemoved: %s\n",
+                 nested_sm_name, nested_removed ? "yes" : "no");
+      }
+    }
+  }
+  job_end_with_extra(rc, rc == 0 ? NULL : (err[0] ? err : "decompress failed"),
+                     extra[0] ? extra : NULL);
+  free(a);
+  return NULL;
+}
+
+
+static void *
+app_prepare_worker(void *arg) {
+  app_prepare_op_t *a = arg;
+  archive_app_prepare_info_t info;
+  char err[256] = {0};
+  long items = 0;
+  long bytes = 0;
+
+  if(archive_app_prepare_probe(a->path, &info, err, sizeof(err)) == 0 &&
+     info.found) {
+    size_walker(info.app_path, &items, &bytes, 1);
+    atomic_store(&g_job.total_files, items > INT_MAX ? INT_MAX : (int)items);
+    job_set_target(info.prepared_path);
+  }
+
+  int rc = archive_app_prepare_apply(a->path, &info, err, sizeof(err));
+  if(rc == 0) {
+    atomic_store(&g_job.done_files, atomic_load(&g_job.total_files));
+  }
+  job_end(rc, rc == 0 ? NULL : (err[0] ? err : "prepare failed"));
+  free(a);
+  return NULL;
+}
+
+
+static int
+append_app_prepare_info(json_buf_t *b, const archive_app_prepare_info_t *info) {
+  if(json_appendf(b,
+       "\"found\":%s,\"prepared\":%s,"
+       "\"permissionsOk\":%s,\"pathOk\":%s,"
+       "\"patchMode\":%s,\"targetExists\":%s,"
+       "\"mergeRequired\":%s,"
+       "\"deleteExtraFiles\":%d,\"deleteExtraDirs\":%d",
+       info->found ? "true" : "false",
+       info->prepared ? "true" : "false",
+       info->permissions_ok ? "true" : "false",
+       info->path_ok ? "true" : "false",
+       info->patch_mode ? "true" : "false",
+       info->target_exists ? "true" : "false",
+       info->merge_required ? "true" : "false",
+       info->delete_extra_files,
+       info->delete_extra_dirs) != 0 ||
+     json_append(b, ",\"titleId\":") != 0 ||
+     json_string(b, info->title_id) != 0 ||
+     json_append(b, ",\"scanPath\":") != 0 ||
+     json_string(b, info->scan_path) != 0 ||
+     json_append(b, ",\"appPath\":") != 0 ||
+     json_string(b, info->app_path) != 0 ||
+     json_append(b, ",\"preparedPath\":") != 0 ||
+     json_string(b, info->prepared_path) != 0 ||
+     json_append(b, ",\"deleteExtraSample\":") != 0 ||
+     json_string(b, info->delete_extra_sample) != 0 ||
+     json_append(b, ",\"reason\":") != 0 ||
+     json_string(b, info->reason) != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+
+static int
+app_prepare_probe_handler(const http_request_t *req) {
+  char path[1024];
+  char err[256] = {0};
+  archive_app_prepare_info_t info;
+
+  if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
+     !path_is_safe(path)) {
+    return serve_error(req, 400, "bad path");
+  }
+  if(archive_app_prepare_probe(path, &info, err, sizeof(err)) != 0) {
+    return serve_error(req, 400, err[0] ? err : "prepare probe failed");
+  }
+
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,") != 0 ||
+     append_app_prepare_info(&b, &info) != 0 ||
+     json_append(&b, "}") != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
+
+static int
+app_prepare_handler(const http_request_t *req) {
+  char path[1024];
+  char inline_arg[16] = {0};
+  char err[256] = {0};
+  char log_name[256] = {0};
+  archive_app_prepare_info_t info;
+  int inline_apply = 0;
+
+  if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
+     !path_is_safe(path)) {
+    operation_log_write_simple("prepare", "-", -1, "bad path", 0, 0);
+    return serve_error(req, 400, "bad path");
+  }
+  if(archive_app_prepare_probe(path, &info, err, sizeof(err)) != 0) {
+    operation_log_write_simple("prepare", path, -1,
+                               err[0] ? err : "prepare probe failed", 0, 0);
+    return serve_error(req, 400, err[0] ? err : "prepare probe failed");
+  }
+  if(!info.found) {
+    operation_log_write_simple("prepare", path, -1, "no PS5 app found", 0, 0);
+    return serve_error(req, 400, "no PS5 app found");
+  }
+  if(websrv_get_query_arg(req, "inline", inline_arg, sizeof(inline_arg)) &&
+     strcmp(inline_arg, "0") != 0) {
+    inline_apply = 1;
+  }
+  if(info.prepared) {
+    json_buf_t b = {0};
+    if(json_append(&b, "{\"ok\":true,\"background\":false,\"verb\":\"prepare\",") != 0 ||
+       append_app_prepare_info(&b, &info) != 0 ||
+       json_append(&b, "}") != 0) {
+      free(b.data);
+      return -1;
+    }
+    return serve_owned(req, 200, b.data, b.len);
+  }
+  if(inline_apply) {
+    int rc = archive_app_prepare_apply(path, &info, err, sizeof(err));
+    if(rc != 0) {
+      return serve_error(req, 500, err[0] ? err : "prepare failed");
+    }
+    json_buf_t b = {0};
+    if(json_append(&b, "{\"ok\":true,\"background\":false,\"verb\":\"prepare\",") != 0 ||
+       append_app_prepare_info(&b, &info) != 0 ||
+       json_append(&b, "}") != 0) {
+      free(b.data);
+      return -1;
+    }
+    return serve_owned(req, 200, b.data, b.len);
+  }
+  const char *job_verb = info.patch_mode ? "patch" : "prepare";
+  if(!job_begin(job_verb)) {
+    return serve_error(req, 409, "job already running");
+  }
+  job_set_target(info.prepared_path);
+  job_log_name(log_name, sizeof(log_name));
+
+  app_prepare_op_t *a = calloc(1, sizeof(*a));
+  if(!a) {
+    job_end(-1, "alloc");
+    return serve_error(req, 500, "alloc");
+  }
+  snprintf(a->path, sizeof(a->path), "%s", info.scan_path);
+
+  pthread_t t;
+  pthread_attr_t at;
+  pthread_attr_init(&at);
+  pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+  int trc = pthread_create(&t, &at, app_prepare_worker, a);
+  pthread_attr_destroy(&at);
+  if(trc != 0) {
+    free(a);
+    job_end(-1, "could not start job");
+    return serve_error(req, 500, "could not start job");
+  }
+
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,\"background\":true,\"verb\":") != 0 ||
+     json_string(&b, job_verb) != 0 ||
+     json_append(&b, ",") != 0 ||
+     append_app_prepare_info(&b, &info) != 0 ||
+     json_append(&b, ",\"logName\":") != 0 ||
+     json_string(&b, log_name) != 0 ||
+     json_append(&b, "}") != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
 
 static int
 list_request(const http_request_t *req) {
@@ -1248,6 +2383,29 @@ list_request(const http_request_t *req) {
       int backups = archive_backup_count(full);
       if(backups > 0 &&
          json_appendf(&b, ",\"backups\":%d", backups) != 0) break;
+      pfs_app_info_t app_info;
+      char probe_err[128] = {0};
+      if(pfs_app_probe(full, &app_info, probe_err, sizeof(probe_err)) == 0) {
+        if(json_append(&b, ",\"compressible\":true,\"titleId\":") != 0 ||
+           json_string(&b, app_info.title_id) != 0 ||
+           json_append(&b, ",\"compressOutput\":") != 0 ||
+           json_string(&b, app_info.output_path) != 0 ||
+           json_appendf(&b, ",\"compressOutputExists\":%s",
+                        app_info.output_exists ? "true" : "false") != 0) {
+          break;
+        }
+      }
+    } else if(S_ISREG(st.st_mode)) {
+      pfs_decompress_info_t dec_info;
+      char probe_err[128] = {0};
+      if(pfs_decompress_probe(full, &dec_info, probe_err, sizeof(probe_err)) == 0) {
+        if(json_append(&b, ",\"decompressible\":true,\"decompressOutput\":") != 0 ||
+           json_string(&b, dec_info.output_path) != 0 ||
+           json_appendf(&b, ",\"decompressOutputExists\":%s",
+                        dec_info.output_exists ? "true" : "false") != 0) {
+          break;
+        }
+      }
     }
     if(json_append(&b, "}") != 0) break;
   }
@@ -1626,6 +2784,299 @@ chmod777_handler(const http_request_t *req) {
 
 
 static int
+app_checksum_handler(const http_request_t *req) {
+  char path[1024];
+  char log_name[256] = {0};
+  struct stat st;
+
+  if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
+     !path_is_safe(path)) {
+    operation_log_write_simple("checksum", "-", -1, "bad path", 0, 0);
+    return serve_error(req, 400, "bad path");
+  }
+  if(!strcmp(path, "/")) {
+    operation_log_write_simple("checksum", path, -1,
+                               "refusing to checksum root path", 0, 0);
+    return serve_error(req, 403, "refusing to checksum root path");
+  }
+  if(lstat(path, &st) != 0) {
+    operation_log_write_simple("checksum", path, -1, strerror(errno), 0, 0);
+    return serve_error(req, 404, strerror(errno));
+  }
+  if(!S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode)) {
+    operation_log_write_simple("checksum", path, -1,
+                               "checksum needs a folder or file", 0, 0);
+    return serve_error(req, 400, "checksum needs a folder or file");
+  }
+
+  bg_file_op_t *a = calloc(1, sizeof(*a));
+  if(!a) {
+    return serve_error(req, 500, "alloc");
+  }
+  snprintf(a->verb, sizeof(a->verb), "%s", "checksum");
+  snprintf(a->src, sizeof(a->src), "%s", path);
+  snprintf(a->target, sizeof(a->target), "%s", path);
+  a->started_at = time(NULL);
+  operation_log_make_path(a->log_path, sizeof(a->log_path), a->verb,
+                          a->started_at);
+  if(a->log_path[0]) snprintf(log_name, sizeof(log_name), "%s",
+                              path_basename(a->log_path));
+  bg_file_op_write_running(a);
+
+  pthread_t t;
+  pthread_attr_t at;
+  pthread_attr_init(&at);
+  pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+  int trc = pthread_create(&t, &at, checksum_worker, a);
+  pthread_attr_destroy(&at);
+  if(trc != 0) {
+    snprintf(a->error, sizeof(a->error), "could not start job");
+    bg_file_op_finish(a, -1);
+    free(a);
+    return serve_error(req, 500, "could not start job");
+  }
+
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,\"background\":true,\"verb\":\"checksum\",\"path\":") != 0 ||
+     json_string(&b, path) != 0 ||
+     json_append(&b, ",\"logName\":") != 0 ||
+     json_string(&b, log_name) != 0 ||
+     json_append(&b, "}") != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
+
+static int
+app_compress_handler(const http_request_t *req) {
+  char path[1024], overwrite_arg[32], convert_arg[32];
+  char format_arg[32], delete_arg[32];
+  char err[256] = {0};
+  pfs_app_info_t info;
+  int overwrite = 0;
+  int convert = 0;
+  int format = PFS_COMPRESS_FORMAT_PFS;
+  int delete_policy = PFS_DELETE_KEEP;
+  int workers = PFS_COMPRESS_DEFAULT_WORKERS;
+
+  if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
+     !path_is_safe(path)) {
+    operation_log_write_simple("compress", "-", -1, "bad path", 0, 0);
+    return serve_error(req, 400, "bad path");
+  }
+  if(websrv_get_query_arg(req, "overwrite", overwrite_arg,
+                          sizeof(overwrite_arg)) &&
+     strcmp(overwrite_arg, "0") != 0) {
+    overwrite = 1;
+  }
+  if(websrv_get_query_arg(req, "convert", convert_arg,
+                          sizeof(convert_arg)) &&
+     strcmp(convert_arg, "0") != 0) {
+    convert = 1;
+  }
+  if(websrv_get_query_arg(req, "format", format_arg, sizeof(format_arg))) {
+    if(!strcasecmp(format_arg, "pfs")) {
+      format = PFS_COMPRESS_FORMAT_PFS;
+    } else if(!strcasecmp(format_arg, "exfat")) {
+      format = PFS_COMPRESS_FORMAT_EXFAT;
+    } else {
+      operation_log_write_simple("compress", path, -1,
+                                 "bad compression format", 0, 0);
+      return serve_error(req, 400, "bad compression format");
+    }
+  }
+  if(websrv_get_query_arg(req, "delete", delete_arg, sizeof(delete_arg))) {
+    if(!strcasecmp(delete_arg, "keep")) {
+      delete_policy = PFS_DELETE_KEEP;
+    } else if(!strcasecmp(delete_arg, "after")) {
+      delete_policy = PFS_DELETE_AFTER;
+    } else if(!strcasecmp(delete_arg, "stream")) {
+      delete_policy = PFS_DELETE_STREAM;
+    } else {
+      operation_log_write_simple("compress", path, -1,
+                                 "bad delete policy", 0, 0);
+      return serve_error(req, 400, "bad delete policy");
+    }
+  }
+  if(convert) {
+    format = PFS_COMPRESS_FORMAT_PFS;
+    delete_policy = PFS_DELETE_STREAM;
+  }
+  if(pfs_app_probe(path, &info, err, sizeof(err)) != 0) {
+    operation_log_write_simple("compress", path, -1,
+                               err[0] ? err : "not compressible", 0, 0);
+    return serve_error(req, 400, err[0] ? err : "not compressible");
+  }
+  if(delete_policy != PFS_DELETE_KEEP &&
+     app_convert_path_forbidden(info.source_path)) {
+    operation_log_write_simple("compress", info.source_path, -1,
+                               "convert is not allowed for mounted paths", 0, 0);
+    return serve_error(req, 403, "convert is not allowed for mounted paths");
+  }
+  if(info.output_exists && !overwrite) {
+    operation_log_write_simple("compress", info.output_path, -1,
+                               "output exists", 0, 0);
+    return serve_error(req, 409, "output exists");
+  }
+  if(!job_begin("compress")) {
+    return serve_error(req, 409, "job already running");
+  }
+
+  app_compress_op_t *a = calloc(1, sizeof(*a));
+  if(!a) {
+    job_end(-1, "alloc");
+    return serve_error(req, 500, "alloc");
+  }
+  snprintf(a->path, sizeof(a->path), "%s", info.source_path);
+  a->overwrite = overwrite;
+  a->workers = workers;
+  a->format = format;
+  a->delete_policy = delete_policy;
+
+  pthread_t t;
+  pthread_attr_t at;
+  pthread_attr_init(&at);
+  pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+  int trc = pthread_create(&t, &at, app_compress_worker, a);
+  pthread_attr_destroy(&at);
+  if(trc != 0) {
+    free(a);
+    job_end(-1, "could not start job");
+    return serve_error(req, 500, "could not start job");
+  }
+
+  json_buf_t b = {0};
+  char nested_name[256];
+  if(format == PFS_COMPRESS_FORMAT_EXFAT) {
+    snprintf(nested_name, sizeof(nested_name), "%s.exfat", info.title_id);
+  } else {
+    snprintf(nested_name, sizeof(nested_name), "pfs_image.dat");
+  }
+  if(json_append(&b, "{\"ok\":true,\"background\":true,\"verb\":\"compress\",\"path\":") != 0 ||
+     json_string(&b, info.source_path) != 0 ||
+     json_append(&b, ",\"titleId\":") != 0 ||
+	     json_string(&b, info.title_id) != 0 ||
+	     json_append(&b, ",\"output\":") != 0 ||
+	     json_string(&b, info.output_path) != 0 ||
+	     json_append(&b, ",\"format\":") != 0 ||
+	     json_string(&b, app_compress_format_name(format)) != 0 ||
+	     json_append(&b, ",\"deletePolicy\":") != 0 ||
+	     json_string(&b, app_delete_policy_name(delete_policy)) != 0 ||
+	     json_append(&b, ",\"nestedName\":") != 0 ||
+	     json_string(&b, nested_name) != 0 ||
+	     json_appendf(&b, ",\"convert\":%s", convert ? "true" : "false") != 0 ||
+	     json_append(&b, "}") != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
+
+static int
+app_decompress_handler(const http_request_t *req) {
+  char path[1024], overwrite_arg[32], convert_arg[32], delete_arg[32];
+  char err[256] = {0};
+  pfs_decompress_info_t info;
+  int overwrite = 0;
+  int convert = 0;
+  int delete_policy = PFS_DELETE_KEEP;
+  int workers = PFS_COMPRESS_DEFAULT_WORKERS;
+
+  if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
+     !path_is_safe(path)) {
+    operation_log_write_simple("decompress", "-", -1, "bad path", 0, 0);
+    return serve_error(req, 400, "bad path");
+  }
+  if(websrv_get_query_arg(req, "overwrite", overwrite_arg,
+                          sizeof(overwrite_arg)) &&
+     strcmp(overwrite_arg, "0") != 0) {
+    overwrite = 1;
+  }
+  if(websrv_get_query_arg(req, "convert", convert_arg,
+                          sizeof(convert_arg)) &&
+     strcmp(convert_arg, "0") != 0) {
+    convert = 1;
+  }
+  if(websrv_get_query_arg(req, "delete", delete_arg, sizeof(delete_arg))) {
+    if(!strcasecmp(delete_arg, "keep")) {
+      delete_policy = PFS_DELETE_KEEP;
+    } else if(!strcasecmp(delete_arg, "after")) {
+      delete_policy = PFS_DELETE_AFTER;
+    } else if(!strcasecmp(delete_arg, "stream")) {
+      delete_policy = PFS_DELETE_STREAM;
+    } else {
+      operation_log_write_simple("decompress", path, -1,
+                                 "bad delete policy", 0, 0);
+      return serve_error(req, 400, "bad delete policy");
+    }
+  }
+  if(convert) delete_policy = PFS_DELETE_STREAM;
+  if(pfs_decompress_detect_nested(path, &info, err, sizeof(err)) != 0) {
+    operation_log_write_simple("decompress", path, -1,
+                               err[0] ? err : "not decompressible", 0, 0);
+    return serve_error(req, 400, err[0] ? err : "not decompressible");
+  }
+  if(delete_policy != PFS_DELETE_KEEP &&
+     app_convert_path_forbidden(info.source_path)) {
+    operation_log_write_simple("decompress", info.source_path, -1,
+                               "convert is not allowed for mounted paths", 0, 0);
+    return serve_error(req, 403, "convert is not allowed for mounted paths");
+  }
+  if(info.output_exists && !overwrite) {
+    operation_log_write_simple("decompress", info.output_path, -1,
+                               "output exists", 0, 0);
+    return serve_error(req, 409, "output exists");
+  }
+  if(!job_begin("decompress")) {
+    return serve_error(req, 409, "job already running");
+  }
+
+  app_decompress_op_t *a = calloc(1, sizeof(*a));
+  if(!a) {
+    job_end(-1, "alloc");
+    return serve_error(req, 500, "alloc");
+  }
+  snprintf(a->path, sizeof(a->path), "%s", info.source_path);
+  a->overwrite = overwrite;
+  a->workers = workers;
+  a->delete_policy = delete_policy;
+
+  pthread_t t;
+  pthread_attr_t at;
+  pthread_attr_init(&at);
+  pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+  int trc = pthread_create(&t, &at, app_decompress_worker, a);
+  pthread_attr_destroy(&at);
+  if(trc != 0) {
+    free(a);
+    job_end(-1, "could not start job");
+    return serve_error(req, 500, "could not start job");
+  }
+
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,\"background\":true,\"verb\":\"decompress\",\"path\":") != 0 ||
+	     json_string(&b, info.source_path) != 0 ||
+	     json_append(&b, ",\"output\":") != 0 ||
+	     json_string(&b, info.output_path) != 0 ||
+	     json_append(&b, ",\"deletePolicy\":") != 0 ||
+	     json_string(&b, app_delete_policy_name(delete_policy)) != 0 ||
+	     json_append(&b, ",\"nestedType\":") != 0 ||
+	     json_string(&b, app_nested_type_name(info.nested_type)) != 0 ||
+	     json_append(&b, ",\"nestedName\":") != 0 ||
+	     json_string(&b, info.nested_name) != 0 ||
+	     json_appendf(&b, ",\"convert\":%s", convert ? "true" : "false") != 0 ||
+	     json_append(&b, "}") != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
+
+static int
 mkdir_handler(const http_request_t *req) {
   char path[1024];
   if(!websrv_get_query_arg(req, "path", path, sizeof(path)) ||
@@ -1702,7 +3153,7 @@ status_handler(const http_request_t *req) {
   time_t now = time(NULL);
   time_t ref_at = busy ? now : (ended_at ? ended_at : now);
   long elapsed = started_at > 0 && ref_at > started_at
-                     ? (long)(ref_at - started_at)
+	                     ? (long)(ref_at - started_at)
                      : 0;
   long speed = elapsed > 0 && cb > 0 ? cb / elapsed : 0;
   long eta = busy && speed > 0 && tb > cb
@@ -1716,7 +3167,7 @@ status_handler(const http_request_t *req) {
      json_string(&b, verb) != 0 ||
      json_append(&b, ",\"current\":") != 0 ||
      json_string(&b, current) != 0 ||
-     json_append(&b, ",\"error\":") != 0 ||
+	     json_append(&b, ",\"error\":") != 0 ||
      json_string(&b, err) != 0 ||
      json_appendf(&b,
       ",\"totalBytes\":%ld,\"copiedBytes\":%ld,"
@@ -1724,8 +3175,8 @@ status_handler(const http_request_t *req) {
       "\"startedAt\":%ld,\"endedAt\":%ld,"
       "\"elapsedSeconds\":%ld,\"speedBytesPerSec\":%ld,"
       "\"etaSeconds\":%ld}",
-      tb, cb, tf, df, ff, (long)started_at, (long)ended_at,
-      elapsed, speed, eta) != 0) {
+      tb, cb, tf, df, ff, (long)started_at, (long)ended_at, elapsed, speed,
+      eta) != 0) {
     free(b.data);
     return -1;
   }
@@ -1753,6 +3204,11 @@ transfer_request(const http_request_t *req, const char *url) {
   if(!strcmp(url, "/api/fs/move")) return spawn_copy_or_move(req, 1);
   if(!strcmp(url, "/api/fs/delete")) return delete_handler(req);
   if(!strcmp(url, "/api/fs/chmod777")) return chmod777_handler(req);
+  if(!strcmp(url, "/api/fs/app-prepare/probe")) return app_prepare_probe_handler(req);
+  if(!strcmp(url, "/api/fs/app-prepare")) return app_prepare_handler(req);
+  if(!strcmp(url, "/api/fs/app-checksum")) return app_checksum_handler(req);
+  if(!strcmp(url, "/api/fs/app-compress")) return app_compress_handler(req);
+  if(!strcmp(url, "/api/fs/app-decompress")) return app_decompress_handler(req);
   if(!strcmp(url, "/api/fs/mkdir")) return mkdir_handler(req);
   if(!strcmp(url, "/api/fs/rename")) return rename_handler(req);
   if(!strcmp(url, "/api/fs/job/status")) return status_handler(req);
@@ -1768,6 +3224,7 @@ transfer_request(const http_request_t *req, const char *url) {
   if(!strcmp(url, "/api/fs/logs/clear")) return logs_clear_handler(req);
   if(!strcmp(url, "/api/fs/backups/list")) return archive_backups_list_handler(req);
   if(!strcmp(url, "/api/fs/backups/restore")) return archive_backup_restore_handler(req);
+  if(!strcmp(url, "/api/fs/backups/remove")) return archive_backup_remove_handler(req);
   if(!strcmp(url, "/api/fs/extract")) return extract_archive_handler(req);
   if(!strcmp(url, "/api/fs/upload-complete")) return upload_complete_handler(req);
   return serve_error(req, 404, "no such endpoint");
@@ -1949,9 +3406,29 @@ build_queue_temp_path(const char *final_path, const char *queue_id,
 static int
 activity_append_log_json(json_buf_t *b, const char *name, const struct stat *st,
                          const char *result, const char *operation,
-                         const char *target, const char *error) {
+                         const char *target, const char *error,
+                         const log_summary_t *summary) {
   char id[320];
   json_buf_t *jb = b;
+  long mtime = st ? (long)st->st_mtime : (long)time(NULL);
+  long started_at = summary && summary->started_at > 0 ?
+                    summary->started_at : mtime;
+  long ended_at = summary && summary->ended_at > 0 ?
+                  summary->ended_at : mtime;
+  long updated_at = ended_at > 0 ? ended_at : mtime;
+  long total_bytes = summary ? summary->total_bytes : 0;
+  long copied_bytes = summary ? summary->copied_bytes : 0;
+  int total_items = summary ? summary->total_items : 0;
+  int done_items = summary ? summary->done_items : 0;
+  int failed_items = summary ? summary->failed_items : 0;
+  if(result && (!strcmp(result, "running") || !strcmp(result, "queued"))) {
+    updated_at = mtime;
+  }
+  const char *display_name = operation;
+  if(target && target[0] && strcmp(target, "-")) {
+    const char *base = path_basename(target);
+    if(base && *base) display_name = base;
+  }
   snprintf(id, sizeof(id), "log:%s", name ? name : "");
   if(json_append(jb, "{\"source\":\"log\",\"queueId\":") != 0 ||
      json_string(jb, id) != 0 ||
@@ -1960,7 +3437,7 @@ activity_append_log_json(json_buf_t *b, const char *name, const struct stat *st,
      json_append(jb, ",\"operation\":") != 0 ||
      json_string(jb, operation) != 0 ||
      json_append(jb, ",\"displayName\":") != 0 ||
-     json_string(jb, operation) != 0 ||
+     json_string(jb, display_name) != 0 ||
      json_append(jb, ",\"target\":") != 0 ||
      json_string(jb, target) != 0 ||
      json_append(jb, ",\"status\":") != 0 ||
@@ -1968,12 +3445,12 @@ activity_append_log_json(json_buf_t *b, const char *name, const struct stat *st,
      json_append(jb, ",\"result\":") != 0 ||
      json_string(jb, result) != 0 ||
      json_appendf(jb,
-       ",\"position\":0,\"totalBytes\":0,\"copiedBytes\":0,"
-       "\"totalItems\":0,\"doneItems\":0,\"failedItems\":0,"
-       "\"createdAt\":%ld,\"updatedAt\":%ld,\"startedAt\":0,"
+       ",\"position\":0,\"totalBytes\":%ld,\"copiedBytes\":%ld,"
+       "\"totalItems\":%d,\"doneItems\":%d,\"failedItems\":%d,"
+       "\"createdAt\":%ld,\"updatedAt\":%ld,\"startedAt\":%ld,"
        "\"endedAt\":%ld,\"mtime\":%ld,\"owned\":false",
-       (long)st->st_mtime, (long)st->st_mtime,
-       (long)st->st_mtime, (long)st->st_mtime) != 0 ||
+       total_bytes, copied_bytes, total_items, done_items, failed_items,
+       started_at, updated_at, started_at, ended_at, mtime) != 0 ||
      json_append(jb, ",\"error\":") != 0 ||
      json_string(jb, error) != 0 ||
      json_append(jb, ",\"logName\":") != 0 ||
@@ -1999,20 +3476,24 @@ activity_queue_has_log_locked(const char *name) {
 
 
 static int
-activity_append_logs(json_buf_t *b, int *first) {
+activity_append_logs(json_buf_t *b, int *first, int limit) {
+  if(limit <= 0) return 0;
+  if(limit > ACTIVITY_LOG_LIMIT_MAX) limit = ACTIVITY_LOG_LIMIT_MAX;
   if(operation_log_dir_ready() != 0) return 0;
   DIR *d = opendir(OP_LOG_DIR);
   if(!d) return 0;
+  activity_log_candidate_t *candidates =
+    calloc((size_t)limit, sizeof(*candidates));
+  if(!candidates) {
+    closedir(d);
+    return 0;
+  }
 
   struct dirent *ent;
+  int count = 0;
   while((ent = readdir(d))) {
     if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
     if(!log_name_safe(ent->d_name)) continue;
-
-    pthread_mutex_lock(&g_activity.lock);
-    int skip = activity_queue_has_log_locked(ent->d_name);
-    pthread_mutex_unlock(&g_activity.lock);
-    if(skip) continue;
 
     char path[1024];
     if(snprintf(path, sizeof(path), "%s/%s", OP_LOG_DIR, ent->d_name) >=
@@ -2022,6 +3503,38 @@ activity_append_logs(json_buf_t *b, int *first) {
     struct stat st;
     if(lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
 
+    pthread_mutex_lock(&g_activity.lock);
+    int skip = activity_queue_has_log_locked(ent->d_name);
+    pthread_mutex_unlock(&g_activity.lock);
+    if(skip) continue;
+
+    activity_log_candidate_t candidate;
+    memset(&candidate, 0, sizeof(candidate));
+    if(snprintf(candidate.name, sizeof(candidate.name), "%s", ent->d_name) >=
+       (int)sizeof(candidate.name)) {
+      continue;
+    }
+    candidate.st = st;
+    if(count < limit) {
+      candidates[count++] = candidate;
+    } else {
+      int oldest = activity_log_candidate_oldest_index(candidates, count);
+      if(activity_log_candidate_newer(&candidate, &candidates[oldest])) {
+        candidates[oldest] = candidate;
+      }
+    }
+  }
+  closedir(d);
+
+  qsort(candidates, (size_t)count, sizeof(candidates[0]),
+        activity_log_candidate_cmp_desc);
+
+  for(int i = 0; i < count; i++) {
+    char path[1024];
+    if(snprintf(path, sizeof(path), "%s/%s", OP_LOG_DIR,
+                candidates[i].name) >= (int)sizeof(path)) {
+      continue;
+    }
     char result[32], operation[32], target[256], error[256];
     if(read_log_field(path, "Result: ", result, sizeof(result)) != 0) {
       snprintf(result, sizeof(result), "unknown");
@@ -2035,15 +3548,18 @@ activity_append_logs(json_buf_t *b, int *first) {
     if(read_log_field(path, "Error: ", error, sizeof(error)) != 0) {
       snprintf(error, sizeof(error), "");
     }
+    log_summary_t summary;
+    read_log_summary(path, &summary);
 
     if(!*first && json_append(b, ",") != 0) break;
     *first = 0;
-    if(activity_append_log_json(b, ent->d_name, &st, result, operation,
-                                target, error) != 0) {
+    if(activity_append_log_json(b, candidates[i].name, &candidates[i].st,
+                                result, operation, target, error,
+                                &summary) != 0) {
       break;
     }
   }
-  closedir(d);
+  free(candidates);
   return 0;
 }
 
@@ -2132,6 +3648,10 @@ activity_poll_handler(const http_request_t *req) {
     return serve_error(req, 400, "bad activity client");
   }
   if(!websrv_get_query_arg(req, "owned", owned, sizeof(owned))) owned[0] = 0;
+  int include_logs = query_arg_truthy(req, "logs", 1);
+  int log_limit = parse_int_query_arg(req, "limit",
+                                      ACTIVITY_LOG_LIMIT_DEFAULT, 0,
+                                      ACTIVITY_LOG_LIMIT_MAX);
 
   pthread_mutex_lock(&g_activity.lock);
   for(int i = 0; i < ACTIVITY_MAX; i++) {
@@ -2255,7 +3775,7 @@ activity_poll_handler(const http_request_t *req) {
   }
   pthread_mutex_unlock(&g_activity.lock);
 
-  activity_append_logs(&b, &first);
+  if(include_logs) activity_append_logs(&b, &first, log_limit);
   if(json_append(&b, "]}") != 0) {
     free(b.data);
     return -1;
@@ -2311,6 +3831,8 @@ static int
 activity_complete_handler(const http_request_t *req) {
   activity_request_ctx_t ctx;
   char err[ACTIVITY_ERROR_MAX] = {0}, status[32], log_name[256] = {0};
+  char existing_log[256] = {0}, log_path[1024] = {0};
+  char current[512] = {0}, extra[1024] = {0};
   uint64_t copied = 0, total = 0, done = 0, failed = 0;
   int rc = -1;
 
@@ -2325,6 +3847,9 @@ activity_complete_handler(const http_request_t *req) {
     snprintf(status, sizeof(status), "failed");
   }
   if(!websrv_get_query_arg(req, "error", err, sizeof(err))) err[0] = 0;
+  websrv_get_query_arg(req, "logName", existing_log, sizeof(existing_log));
+  websrv_get_query_arg(req, "current", current, sizeof(current));
+  websrv_get_query_arg(req, "extra", extra, sizeof(extra));
   parse_upload_size_arg(req, "copied", &copied);
   parse_upload_size_arg(req, "total", &total);
   parse_upload_size_arg(req, "done", &done);
@@ -2346,12 +3871,39 @@ activity_complete_handler(const http_request_t *req) {
   int total_items = done_items + failed_items;
   if(total_items <= 0) total_items = rc == 0 ? 1 : 0;
 
-  operation_log_write_named(log_name, sizeof(log_name), kind[0] ? kind : "upload",
-                            target[0] ? target : name, rc,
-                            err[0] ? err : NULL, time(NULL), time(NULL),
-                            zip_job_long(total), zip_job_long(copied),
-                            total_items, done_items, failed_items,
-                            target[0] ? target : name);
+  if(existing_log[0] && log_name_safe(existing_log) &&
+     snprintf(log_path, sizeof(log_path), "%s/%s", OP_LOG_DIR,
+              existing_log) < (int)sizeof(log_path)) {
+    struct stat st;
+    if(lstat(log_path, &st) == 0 && S_ISREG(st.st_mode)) {
+      log_summary_t summary;
+      read_log_summary(log_path, &summary);
+      if(total == 0 && summary.total_bytes > 0) total = (uint64_t)summary.total_bytes;
+      if(copied == 0 && summary.copied_bytes > 0) copied = (uint64_t)summary.copied_bytes;
+      if(done_items == 0 && summary.done_items > 0) done_items = summary.done_items;
+      if(total_items <= 1 && summary.total_items > 0) total_items = summary.total_items;
+      if(failed_items == 0 && summary.failed_items > 0) failed_items = summary.failed_items;
+      operation_log_write_at_extra(log_path, operation_result_name(rc, err),
+                                   kind[0] ? kind : "upload",
+                                   target[0] ? target : name,
+                                   err[0] ? err : NULL,
+                                   summary.started_at > 0 ? summary.started_at : time(NULL),
+                                   time(NULL),
+                                   zip_job_long(total), zip_job_long(copied),
+                                   total_items, done_items, failed_items,
+                                   current[0] ? current : (target[0] ? target : name),
+                                   extra);
+      snprintf(log_name, sizeof(log_name), "%s", existing_log);
+    }
+  }
+  if(!log_name[0]) {
+    operation_log_write_named(log_name, sizeof(log_name), kind[0] ? kind : "upload",
+                              target[0] ? target : name, rc,
+                              err[0] ? err : NULL, time(NULL), time(NULL),
+                              zip_job_long(total), zip_job_long(copied),
+                              total_items, done_items, failed_items,
+                              current[0] ? current : (target[0] ? target : name));
+  }
   if(!strcmp(status, "cancelled")) {
     pthread_mutex_lock(&g_activity.lock);
     activity_item_t *item = activity_find_locked(ctx.queue_id);
@@ -2476,6 +4028,12 @@ logs_list_handler(const http_request_t *req) {
     if(read_log_field(path, "Error: ", error, sizeof(error)) != 0) {
       snprintf(error, sizeof(error), "");
     }
+    log_summary_t summary;
+    read_log_summary(path, &summary);
+    long started_at = summary.started_at > 0 ? summary.started_at :
+                      (long)st.st_mtime;
+    long ended_at = summary.ended_at > 0 ? summary.ended_at :
+                    (long)st.st_mtime;
 
     if(!first && json_append(&b, ",") != 0) break;
     first = 0;
@@ -2488,6 +4046,12 @@ logs_list_handler(const http_request_t *req) {
        json_string(&b, operation) != 0 ||
        json_append(&b, ",\"target\":") != 0 ||
        json_string(&b, target) != 0 ||
+       json_appendf(&b,
+        ",\"startedAt\":%ld,\"endedAt\":%ld,"
+        "\"totalBytes\":%ld,\"copiedBytes\":%ld,"
+        "\"totalItems\":%d,\"doneItems\":%d,\"failedItems\":%d",
+        started_at, ended_at, summary.total_bytes, summary.copied_bytes,
+        summary.total_items, summary.done_items, summary.failed_items) != 0 ||
        json_append(&b, ",\"error\":") != 0 ||
        json_string(&b, error) != 0 ||
        json_append(&b, "}") != 0) {

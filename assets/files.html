@@ -521,7 +521,9 @@
       right: 0;
       top: 34px;
       z-index: 5;
-      width: 150px;
+      width: max-content;
+      min-width: 170px;
+      max-width: calc(100vw - 24px);
       display: none;
       gap: 4px;
       padding: 6px;
@@ -536,6 +538,7 @@
     }
 
     .row-menu button {
+      width: 100%;
       min-height: 32px;
       display: grid;
       grid-template-columns: 20px minmax(0, 1fr);
@@ -545,6 +548,13 @@
       text-align: left;
       background: transparent;
       border-color: transparent;
+    }
+
+    .row-menu button span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .row-menu button:hover,
@@ -588,6 +598,12 @@
       font-size: 12px;
     }
 
+    .backup-item-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .toolbar-menu {
       position: fixed;
       right: auto;
@@ -596,7 +612,7 @@
     }
 
     #install-menu {
-      width: 190px;
+      min-width: 190px;
     }
 
     .name,
@@ -691,6 +707,11 @@
       white-space: nowrap;
     }
 
+    .detail-row.wrap span:last-child {
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
     .detail-note {
       margin-top: 7px;
       padding-top: 7px;
@@ -723,6 +744,8 @@
 
     .log-entry {
       min-height: 58px;
+      content-visibility: auto;
+      contain-intrinsic-size: 58px;
       display: grid;
       grid-template-columns: 32px minmax(0, 1fr);
       gap: 9px;
@@ -890,22 +913,63 @@
       white-space: nowrap;
     }
 
+    .activity-time-row {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .activity-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 0;
+    }
+
+    .activity-footer .log-time {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .activity-footer .activity-time-row {
+      flex: 0 0 auto;
+    }
+
+    .log-main .activity-footer,
+    .log-main .activity-footer span,
+    .log-main .activity-time-row,
+    .log-main .activity-time-row span {
+      overflow: visible;
+      text-overflow: clip;
+    }
+
+    .activity-duration {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .activity-duration svg {
+      width: 13px;
+      height: 13px;
+      flex: none;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2.1;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
     .activity-warning {
       color: #ffd36a;
-    }
-
-    .activity-meter {
-      height: 5px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: #101922;
-    }
-
-    .activity-meter span {
-      display: block;
-      height: 100%;
-      width: 0;
-      background: linear-gradient(90deg, var(--deep), #85f2bf);
     }
 
     .log-content {
@@ -923,6 +987,7 @@
     .modal-actions {
       display: flex;
       flex-wrap: wrap;
+      justify-content: flex-end;
       gap: 8px;
       margin-top: 10px;
       padding-top: 10px;
@@ -976,6 +1041,140 @@
       min-width: 0;
       overflow: auto;
       padding: 12px;
+    }
+
+    .convert-modal-card {
+      width: min(620px, 100%);
+    }
+
+    .option-subtitle {
+      margin: 0 0 12px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .option-section {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 14px;
+    }
+
+    .option-section > strong {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #8fb0c4;
+    }
+
+    .choice-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .choice-option {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 9px;
+      align-items: flex-start;
+      padding: 10px 76px 10px 10px;
+      border: 1px solid #33475a;
+      border-radius: 8px;
+      background: rgba(13, 20, 28, .72);
+      cursor: pointer;
+      outline: none;
+      transition: border-color .12s ease, background .12s ease,
+                  box-shadow .12s ease, transform .12s ease;
+    }
+
+    .choice-option input {
+      width: 18px;
+      height: 18px;
+      margin-top: 3px;
+      accent-color: var(--deep);
+      pointer-events: none;
+    }
+
+    .choice-option:hover {
+      border-color: #5b748b;
+      background: rgba(18, 28, 39, .92);
+    }
+
+    .choice-option:focus,
+    .choice-option:focus-visible {
+      border-color: #7cc5ff;
+      box-shadow: 0 0 0 3px rgba(124, 197, 255, .28);
+    }
+
+    .choice-option.is-selected {
+      border-color: var(--deep-2);
+      background: linear-gradient(180deg, rgba(24, 73, 54, .92),
+        rgba(16, 45, 35, .92));
+      box-shadow: inset 0 0 0 1px rgba(94, 224, 170, .75);
+    }
+
+    .choice-option.is-selected::after {
+      content: "Selected";
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      max-width: 62px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border: 1px solid rgba(94, 224, 170, .65);
+      border-radius: 999px;
+      padding: 3px 7px;
+      background: rgba(6, 19, 14, .72);
+      color: #a9f6d4;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .choice-option.is-selected:focus,
+    .choice-option.is-selected:focus-visible {
+      border-color: #9bd8ff;
+      box-shadow: inset 0 0 0 1px rgba(94, 224, 170, .9),
+                  0 0 0 3px rgba(124, 197, 255, .34);
+    }
+
+    .choice-option span {
+      display: block;
+      min-width: 0;
+    }
+
+    .choice-option strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .choice-option.is-selected strong {
+      color: #f4fff9;
+    }
+
+    .choice-option small {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .choice-option.is-selected small {
+      color: #c9f4df;
+    }
+
+    .option-warning {
+      margin-top: 2px;
+      padding: 10px;
+      border: 1px solid rgba(255, 193, 87, .4);
+      border-radius: 8px;
+      color: #ffd36a;
+      background: rgba(72, 48, 6, .32);
+      line-height: 1.35;
     }
 
     .job {
@@ -1085,6 +1284,45 @@
     .toast.ok {
       border-color: #27724e;
       background: var(--mint);
+    }
+
+    .prepare-prompt {
+      position: fixed;
+      inset: 0;
+      z-index: 14;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .58);
+      padding: 18px;
+    }
+
+    .prepare-card {
+      width: min(480px, 100%);
+      display: grid;
+      gap: 10px;
+      border: 1px solid #386a51;
+      border-radius: 8px;
+      background: #102018;
+      box-shadow: 0 12px 28px var(--shadow);
+      padding: 16px;
+    }
+
+    .prepare-card strong {
+      color: var(--text);
+      font-size: 16px;
+    }
+
+    .prepare-card span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .prepare-prompt-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
     }
 
     .hidden {
@@ -1287,11 +1525,85 @@
     </section>
   </div>
 
+  <div id="compression-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="compression-modal-title">
+    <section class="modal-card convert-modal-card">
+      <div class="modal-head">
+        <strong id="compression-modal-title">Compress</strong>
+        <span class="spacer"></span>
+        <button id="compression-modal-close" type="button">Close</button>
+      </div>
+      <div class="modal-body">
+        <p id="compression-modal-subtitle" class="option-subtitle"></p>
+        <div id="compression-format-section" class="option-section">
+          <strong>Compression Type</strong>
+          <div class="choice-grid">
+            <label class="choice-option">
+              <input type="radio" name="compression-format" value="pfs" checked>
+              <span>
+                <strong>Compressed PFS</strong>
+                <small>Current .ffpfsc layout with nested pfs_image.dat.</small>
+              </span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="compression-format" value="exfat">
+              <span>
+                <strong>Compressed exFAT</strong>
+                <small>.ffpfsc outer container with nested &lt;TITLE_ID&gt;.exfat at 64 KiB clusters.</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="option-section">
+          <strong id="compression-source-title">Source Handling</strong>
+          <div id="compression-delete-grid" class="choice-grid">
+            <label class="choice-option">
+              <input type="radio" name="compression-delete" value="keep" checked>
+              <span>
+                <strong>Keep both</strong>
+                <small>Leave the source and the new output in place.</small>
+              </span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="compression-delete" value="after">
+              <span>
+                <strong>Delete when finished</strong>
+                <small>Remove the source only after the final output rename succeeds.</small>
+              </span>
+            </label>
+            <label class="choice-option">
+              <input type="radio" name="compression-delete" value="stream">
+              <span>
+                <strong>Delete while converting</strong>
+                <small>Free space progressively as data ranges are safely committed.</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div id="compression-risk" class="option-warning hidden"></div>
+        <div class="modal-actions">
+          <button id="compression-modal-cancel" type="button">Cancel</button>
+          <button id="compression-modal-start" class="primary" type="button">Start</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <input id="file-picker" class="hidden" type="file" multiple>
   <input id="folder-picker" class="hidden" type="file" multiple webkitdirectory directory>
   <input id="zip-picker" class="hidden" type="file" accept=".zip,application/zip,application/x-zip-compressed">
   <input id="rar-picker" class="hidden" type="file" multiple>
   <div id="toast" class="toast"></div>
+  <div id="prepare-prompt" class="prepare-prompt hidden" role="dialog" aria-modal="true"
+    aria-labelledby="prepare-title" aria-live="polite">
+    <section class="prepare-card">
+      <strong id="prepare-title">PS5 app found</strong>
+      <span id="prepare-text"></span>
+      <div class="prepare-prompt-actions">
+        <button id="prepare-keep" type="button">Keep As Is</button>
+        <button id="prepare-now" class="primary" type="button">Prepare Executable</button>
+      </div>
+    </section>
+  </div>
 
   <script>
     const places = [
@@ -1317,8 +1629,11 @@
     const RAR_UPLOAD_MAGIC = 'BFPRAR01';
     const RAR_VOLUME_MAX = 128;
     const LAST_PATH_COOKIE = 'file_explorer_last_path';
+    const SIDE_MODE_COOKIE = 'file_explorer_side_mode';
     const ACTIVITY_CLIENT_KEY = 'file_explorer_activity_client_id';
     const ACTIVITY_POLL_MS = 1200;
+    const ACTIVITY_RENDER_LIMIT = 80;
+    const ACTIVITY_LOG_FETCH_LIMIT = 80;
 
     const state = {
       path: '/data',
@@ -1337,15 +1652,22 @@
       sideMode: 'paths',
       logs: [],
       selectedLog: '',
+      activityRenderKey: '',
       logRefreshTimer: 0,
+      fileRefreshTimer: 0,
       activityPollTimer: 0,
+      activityStatusSeen: new Map(),
+      activityEventsPrimed: false,
       clientId: '',
       localQueue: new Map(),
       localIdSeq: 1,
       activeQueueId: '',
       activeLeaseToken: '',
       activeActivityProgressAt: 0,
-      lastBackgroundWarningAt: 0
+      lastBackgroundWarningAt: 0,
+      preparePromptWaiting: false,
+      preparePrompt: null,
+      compressionModal: null
     };
 
     function el(id) {
@@ -1376,6 +1698,19 @@
 
     function loadLastPath() {
       return cleanPath(cookieValue(LAST_PATH_COOKIE) || '/data');
+    }
+
+    function normalizeSideMode(mode) {
+      return mode === 'activity' || mode === 'logs' ? 'activity' : 'paths';
+    }
+
+    function saveSideMode(mode) {
+      document.cookie = SIDE_MODE_COOKIE + '=' + encodeURIComponent(normalizeSideMode(mode)) +
+        '; max-age=15552000; path=/';
+    }
+
+    function loadSideMode() {
+      return normalizeSideMode(cookieValue(SIDE_MODE_COOKIE));
     }
 
     function parentPath(path) {
@@ -1468,6 +1803,165 @@
       }
     }
 
+    async function probePrepareApp(path) {
+      if (!path) return null;
+      return api('/api/fs/app-prepare/probe?path=' + encodeURIComponent(cleanPath(path)));
+    }
+
+    function closePreparePromptView() {
+      state.preparePromptWaiting = false;
+      const box = el('prepare-prompt');
+      if (box) box.classList.add('hidden');
+    }
+
+    function hidePreparePrompt(result) {
+      const prompt = state.preparePrompt;
+      state.preparePrompt = null;
+      closePreparePromptView();
+      if (prompt && prompt.resolve) {
+        prompt.resolve(result || { action: 'keep', info: prompt.info });
+      }
+    }
+
+    function keepPreparePrompt() {
+      const prompt = state.preparePrompt;
+      el('job').classList.remove('show');
+      hidePreparePrompt({ action: 'keep', info: prompt && prompt.info });
+    }
+
+    function prepareActionLabel(info) {
+      return info && info.patchMode ? 'Apply Patch' : 'Prepare Executable';
+    }
+
+    function prepareWarningText(info) {
+      if (!info) return '';
+      const parts = [];
+      const target = pathBaseName(info.preparedPath || '');
+      const sample = String(info.deleteExtraSample || '');
+      const files = Number(info.deleteExtraFiles || 0);
+      const dirs = Number(info.deleteExtraDirs || 0);
+      if (info.patchMode && info.targetExists) {
+        parts.push('Matching files in ' + (target || 'the app') +
+          ' will be replaced and unrelated files will remain.');
+      } else if (info.mergeRequired) {
+        parts.push(info.patchMode ?
+          ('It will move the extracted patch folder to ' + (target || 'the app folder') + '.') :
+          ('It will merge into existing ' + (target || 'app') +
+            ' and back up replaced files.'));
+      }
+      if (files || dirs) {
+        const count = [];
+        if (files) count.push(files + ' file' + (files === 1 ? '' : 's'));
+        if (dirs) count.push(dirs + ' folder' + (dirs === 1 ? '' : 's'));
+        parts.push('Extra extracted ' + count.join(' and ') +
+          ' outside the app folder will be deleted' +
+          (sample ? ', including ' + sample : '') + '.');
+      }
+      return parts.join(' ');
+    }
+
+    function showPreparePrompt(info, options) {
+      if (!info || !info.found || info.prepared) return;
+      state.preparePrompt = Object.assign({ info }, options || {});
+      state.preparePromptWaiting = true;
+      const toastBox = el('toast');
+      if (toastBox) toastBox.className = 'toast';
+      const action = prepareActionLabel(info);
+      const title = info.titleId ?
+        (info.patchMode ? 'PS5 patch found: ' : 'PS5 app found: ') + info.titleId :
+        (info.patchMode ? 'PS5 patch found' : 'PS5 app found');
+      const reason = info.reason || 'needs Homebrew preparation';
+      const warning = prepareWarningText(info);
+      el('prepare-title').textContent = title;
+      const intro = info.patchMode ?
+        'This archive contains a patch that is not applied yet (' + reason + ').' :
+        'This archive contains an executable app that is not prepared yet (' + reason + ').';
+      el('prepare-text').textContent = intro + (warning ? ' ' + warning : '') +
+        (info.patchMode ? ' Apply it now?' : ' Prepare it now?');
+      el('prepare-now').textContent = action;
+      setJobBox(info.patchMode ? 'patch' : 'prepare', 'Waiting for action', 100);
+      el('prepare-prompt').classList.remove('hidden');
+    }
+
+    async function maybeOfferAppPrepare(path, options) {
+      if (!path) return;
+      try {
+        const info = await probePrepareApp(path);
+        if (info && info.found && !info.prepared) {
+          if (options && options.wait) {
+            return await new Promise((resolve) => {
+              showPreparePrompt(info, Object.assign({}, options, { resolve }));
+            });
+          }
+          showPreparePrompt(info, options);
+          return { action: 'prompted', info };
+        }
+        return { action: 'none', info };
+      } catch (err) {}
+    }
+
+    async function startHomebrewPrepare(path, info, options) {
+      const label = prepareActionLabel(info);
+      const verb = info && info.patchMode ? 'patch' : 'prepare';
+      setJobBox(verb, label, 0);
+      let url = '/api/fs/app-prepare?path=' + encodeURIComponent(cleanPath(path));
+      if (options && options.inline) url += '&inline=1';
+      const result = await api(url);
+      if (result.background) {
+        setTimeout(() => {
+          if (!state.jobTimer) pollJob();
+        }, 150);
+      }
+      return result;
+    }
+
+    async function preparePromptNow() {
+      const prompt = state.preparePrompt;
+      const info = prompt && prompt.info;
+      const path = info && (info.scanPath || info.appPath);
+      if (!path) {
+        hidePreparePrompt();
+        return;
+      }
+      const button = el('prepare-now');
+      button.disabled = true;
+      try {
+        const inline = !!(prompt && prompt.inline && info && !info.patchMode);
+        if (info && info.patchMode) closePreparePromptView();
+        const result = await startHomebrewPrepare(path, info, { inline });
+        if (info && info.patchMode) {
+          if (result.logName) state.selectedLog = 'log:' + result.logName;
+          setSideMode('activity');
+          scheduleLogsReveal();
+          hidePreparePrompt({
+            action: 'patchStarted',
+            info,
+            result
+          });
+          toast('Patch apply started', 'ok');
+          return;
+        }
+        hidePreparePrompt({
+          action: info && info.patchMode ? 'appliedPatch' : 'prepared',
+          info,
+          result
+        });
+        toast(result.background ? prepareActionLabel(info) + ' started' :
+          (info && info.patchMode ? 'Patch applied' : 'Executable prepared'), 'ok');
+        scheduleLogsReveal();
+      } catch (err) {
+        toast('prepare: ' + err.message, 'err');
+        scheduleLogsReveal();
+        hidePreparePrompt({
+          action: 'failed',
+          info,
+          error: err.message || 'prepare failed'
+        });
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     function sortEntries(entries) {
       return entries.slice().sort((a, b) => {
         if (a.dir !== b.dir) return a.dir ? -1 : 1;
@@ -1503,15 +1997,23 @@
       return s + 's';
     }
 
-    function speedMBps(bytesPerSecond) {
+    function speedMiBps(bytesPerSecond) {
       if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return '';
-      const mb = bytesPerSecond / (1024 * 1024);
+      const mb = bytesPerSecond / 1000000;
       return mb.toFixed(mb >= 10 ? 1 : 2) + ' MB/s';
     }
 
     function formatDate(seconds) {
       if (!Number.isFinite(seconds) || seconds <= 0) return 'Unknown';
       return new Date(seconds * 1000).toLocaleString();
+    }
+
+    function formatTimeOnly(seconds) {
+      if (!Number.isFinite(seconds) || seconds <= 0) return 'Unknown';
+      return new Date(seconds * 1000).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
     }
 
     function pollControllerState() {
@@ -1544,12 +2046,38 @@
       const totalFiles = Number(job.totalFiles || 0);
       const failedFiles = Number(job.failedFiles || 0);
       const elapsed = Math.max(0, (Date.now() / 1000) - Number(job.startedAt || 0));
+      const isCompress = (job.verb || '') === 'compress';
+      const isDecompress = (job.verb || '') === 'decompress';
       const reportedSpeed = Number(job.speedBytesPerSec || 0);
       const speed = reportedSpeed > 0 ? reportedSpeed :
         (elapsed > 0 && copied > 0 ? copied / elapsed : 0);
       const reportedEta = Number(job.etaSeconds || 0);
       const pct = total > 0 ? Math.max(0, Math.min(100, (copied / total) * 100)) : 0;
       const parts = [];
+
+      if (isCompress || isDecompress) {
+        if (total > 0) {
+          parts.push(pct.toFixed(1) + '%');
+        } else if (job.busy) {
+          parts.push('Starting');
+        }
+        if (totalFiles > 0) {
+          parts.push(Math.min(doneFiles, totalFiles) + ' / ' + totalFiles + ' items');
+        }
+        if (job.current) {
+          parts.push(job.current);
+        }
+        parts.push(speedMiBps(speed) || '0.00 MB/s');
+        if (reportedEta > 0) {
+          parts.push('ETA ' + shortDuration(reportedEta));
+        } else if (total > copied && speed > 0) {
+          parts.push('ETA ' + shortDuration((total - copied) / speed));
+        }
+        if (failedFiles > 0) parts.push(failedFiles + ' failed');
+        if (job.cancelling) parts.push('cancelling');
+        if (!parts.length) return job.error || 'Done';
+        return parts.join(' | ');
+      }
 
       if (total > 0) {
         parts.push(shortSize(copied) + ' / ' + shortSize(total));
@@ -1563,7 +2091,7 @@
       }
 
       if (speed > 0) {
-        parts.push(speedMBps(speed));
+        parts.push(speedMiBps(speed));
         if (reportedEta > 0) {
           parts.push('ETA ' + shortDuration(reportedEta));
         } else if (total > copied) {
@@ -1633,7 +2161,7 @@
 
       parts.push(Math.min(doneFiles, count) + ' / ' + count + ' files');
       if (speed > 0) {
-        parts.push(speedMBps(speed));
+        parts.push(speedMiBps(speed));
         if (totalBytes > doneBytes) {
           parts.push('ETA ' + shortDuration((totalBytes - doneBytes) / speed));
         }
@@ -1655,6 +2183,7 @@
     function detailRow(label, value) {
       const row = document.createElement('div');
       row.className = 'detail-row';
+      if (label === 'Checksum' || label === 'SHA-256') row.classList.add('wrap');
 
       const key = document.createElement('span');
       key.textContent = label;
@@ -1693,8 +2222,8 @@
     }
 
 
-    function setSideMode(mode) {
-      state.sideMode = (mode === 'activity' || mode === 'logs') ? 'activity' : 'paths';
+    function setSideMode(mode, options) {
+      state.sideMode = normalizeSideMode(mode);
       document.querySelectorAll('[data-side-mode]').forEach((button) => {
         const active = button.dataset.sideMode === state.sideMode;
         button.classList.toggle('active', active);
@@ -1702,6 +2231,7 @@
       });
       el('places').classList.toggle('active', state.sideMode === 'paths');
       el('side-logs').classList.toggle('active', state.sideMode === 'activity');
+      if (!options || options.persist !== false) saveSideMode(state.sideMode);
     }
 
 
@@ -1712,6 +2242,22 @@
         state.logRefreshTimer = 0;
         refreshLogs({ activate: true, preserveSelection: true, quiet: true });
       }, 350);
+    }
+
+
+    function scheduleFileRefresh(delay, fallbackPath) {
+      const refreshPath = state.path;
+      if (state.fileRefreshTimer) clearTimeout(state.fileRefreshTimer);
+      state.fileRefreshTimer = setTimeout(() => {
+        state.fileRefreshTimer = 0;
+        if (state.path !== refreshPath) return;
+        const pathInput = el('path');
+        if (pathInput && document.activeElement === pathInput &&
+            cleanPath(pathInput.value || refreshPath) !== refreshPath) {
+          return;
+        }
+        refresh(refreshPath, { fallbackPath }).catch(() => {});
+      }, Number.isFinite(delay) ? delay : 350);
     }
 
 
@@ -1748,15 +2294,67 @@
     }
 
 
+    function activityEventKey(item) {
+      if (!item) return '';
+      const id = item.queueId || item.name || item.logName || item.localId || '';
+      return id ? String(item.source || 'activity') + ':' + String(id) : '';
+    }
+
+
+    function activityStatusIsTerminal(status) {
+      return status === 'success' || status === 'failed' ||
+        status === 'cancelled' || status === 'abandoned';
+    }
+
+
+    function activityMayChangeFiles(item) {
+      const kind = String((item && (item.kind || item.operation)) || '').toLowerCase();
+      return kind !== 'checksum';
+    }
+
+
+    function trackActivityFileEvents(items) {
+      const current = new Set();
+      let changed = false;
+      let fallbackPath = '';
+
+      for (const item of items || []) {
+        const key = activityEventKey(item);
+        if (!key) continue;
+        const status = activityStatus(item);
+        const hadStatus = state.activityStatusSeen.has(key);
+        const previous = state.activityStatusSeen.get(key);
+        current.add(key);
+        state.activityStatusSeen.set(key, status);
+
+        if (!state.activityEventsPrimed) continue;
+        if (activityStatusIsTerminal(status) && activityMayChangeFiles(item) &&
+            (!hadStatus || previous !== status)) {
+          changed = true;
+          if (!fallbackPath) fallbackPath = item.target || item.destPath || '';
+        }
+      }
+
+      Array.from(state.activityStatusSeen.keys()).forEach((key) => {
+        if (!current.has(key)) state.activityStatusSeen.delete(key);
+      });
+      state.activityEventsPrimed = true;
+      if (changed) scheduleFileRefresh(250, fallbackPath);
+    }
+
+
     function activityKindLabel(kind) {
       kind = String(kind || '').toLowerCase();
       if (kind === 'rar' || kind === 'unrar') return 'RAR';
       if (kind === 'zip' || kind === 'unzip') return 'ZIP';
       if (kind === 'upload') return 'Upload';
+      if (kind === 'prepare') return 'Prepare';
+      if (kind === 'patch') return 'Apply Patch';
       if (kind === 'copy') return 'Copy';
       if (kind === 'move') return 'Move';
       if (kind === 'delete') return 'Delete';
       if (kind === 'chmod') return 'Permissions';
+      if (kind === 'checksum') return 'Checksum';
       if (kind === 'mkdir') return 'Folder';
       if (kind === 'rename') return 'Rename';
       return kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : 'Activity';
@@ -1772,26 +2370,41 @@
 
     function activityMeta(item) {
       const status = activityStatus(item);
-      const parts = [logResultLabel(status)];
-      const copied = Number(item.copiedBytes || item.progress || 0);
-      const total = Number(item.totalBytes || 0);
-      const done = Number(item.doneItems || 0);
-      const totalItems = Number(item.totalItems || 0);
-      const failed = Number(item.failedItems || 0);
       if (status === 'queued' && Number(item.position || 0) > 0) {
-        parts.push('position ' + Number(item.position));
+        return logResultLabel(status) + ' - position ' + Number(item.position);
       }
-      if (total > 0) {
-        parts.push(shortSize(copied) + ' / ' + shortSize(total));
-        parts.push(activityPercent(item).toFixed(1) + '%');
+      return logResultLabel(status);
+    }
+
+
+    function activityDisplayNameIsAction(item, displayName) {
+      const rawKind = String((item && (item.kind || item.operation)) || '').toLowerCase();
+      const action = activityKindLabel(rawKind).toLowerCase();
+      const value = String(displayName || '').trim().toLowerCase();
+      return !!value && (value === rawKind || value === action);
+    }
+
+
+    function activityRowFileName(item) {
+      if (!item) return '';
+      const displayName = String(item.displayName || '').trim();
+      const targetPath = String((item.target || item.destPath) || '').trim();
+      const targetName = targetPath && targetPath !== '-' ? pathBaseName(targetPath) : '';
+      if (item.source === 'log') {
+        if (targetName) return targetName;
+        if (displayName && !activityDisplayNameIsAction(item, displayName)) return displayName;
+      } else if (displayName && !activityDisplayNameIsAction(item, displayName)) {
+        return displayName;
       }
-      if (totalItems > 0) {
-        parts.push(Math.min(done, totalItems) + ' / ' + totalItems + ' items');
-      }
-      if (failed > 0) parts.push(failed + ' failed');
-      const stamp = Number(item.updatedAt || item.mtime || item.createdAt || 0);
-      if (stamp > 0) parts.push(formatDate(stamp));
-      return parts.join(' | ');
+      if (targetName) return targetName;
+      return String((item.logName || item.name || '')).trim();
+    }
+
+
+    function activityRowTitle(item) {
+      const action = activityKindLabel(item && (item.kind || item.operation));
+      const fileName = activityRowFileName(item);
+      return fileName ? action + ' - ' + fileName : action;
     }
 
 
@@ -1818,8 +2431,34 @@
     }
 
 
+    function activityStartedAt(item) {
+      return Number((item && (item.startedAt || item.createdAt || item.mtime || item.updatedAt)) || 0);
+    }
+
+
+    function activityElapsedEndAt(item) {
+      const status = activityStatus(item);
+      if (status === 'running' || status === 'queued') {
+        return Math.floor(Date.now() / 1000);
+      }
+      return Number((item && (item.endedAt || item.updatedAt || item.mtime || item.createdAt)) || 0);
+    }
+
+
+    function activityTimeMeta(item) {
+      const startedAt = activityStartedAt(item);
+      if (startedAt <= 0) return null;
+      const endedAt = activityElapsedEndAt(item);
+      const elapsed = endedAt >= startedAt ? endedAt - startedAt : 0;
+      return {
+        started: 'started at: ' + formatTimeOnly(startedAt),
+        duration: shortDuration(elapsed)
+      };
+    }
+
+
     function activityCreatedAt(item) {
-      return Number((item && (item.createdAt || item.mtime || item.updatedAt)) || 0);
+      return activityStartedAt(item);
     }
 
 
@@ -1830,6 +2469,34 @@
         if (at !== bt) return bt - at;
         return String(b.queueId || b.name || '').localeCompare(String(a.queueId || a.name || ''));
       });
+    }
+
+
+    function activityLogsRenderKey(items) {
+      const logs = Array.from(items || []);
+      return JSON.stringify([
+        logs.length,
+        state.selectedLog,
+        logs.slice(0, ACTIVITY_RENDER_LIMIT).map((log) => [
+          log.queueId || log.name || log.logName || log.localId || '',
+          activityStatus(log),
+          log.owned ? 1 : 0,
+          log.kind || log.operation || '',
+          log.displayName || '',
+          log.target || log.destPath || '',
+          log.error || '',
+          Number(log.position || 0),
+          Number(log.totalBytes || 0),
+          Number(log.copiedBytes || 0),
+          Number(log.totalItems || 0),
+          Number(log.doneItems || 0),
+          Number(log.failedItems || 0),
+          Number(log.startedAt || 0),
+          Number(log.endedAt || 0),
+          Number(log.updatedAt || 0),
+          Number(log.mtime || 0)
+        ])
+      ]);
     }
 
 
@@ -1860,7 +2527,7 @@
     }
 
 
-    function renderLogModal(log, content, truncated, loading) {
+    function renderLogModal(log, content, truncated, loading, prepareInfo) {
       const modal = el('log-modal');
       const body = el('log-modal-body');
       const title = el('log-modal-title');
@@ -1872,7 +2539,7 @@
       const error = fields.Error || (log && log.error) || '';
       const logName = (log && (log.logName || log.name)) || '-';
       const targetPath = activityTargetPath(log, fields);
-      const homebrewApp = canPrepareHomebrew(log, fields, result, operation);
+      const homebrewApp = canPrepareHomebrew(log, fields, result, operation, prepareInfo);
 
       title.textContent = operation + ' - ' + logResultLabel(result);
       body.textContent = '';
@@ -1896,8 +2563,44 @@
         ['Current', fields.Current || '-'],
         ['Log file', logName]
       ];
+      if (fields.Checksum) {
+        rows.splice(3, 0,
+          ['Checksum', fields.Checksum],
+          ['Algorithm', fields.ChecksumAlgorithm || 'SHA-256'],
+          ['Scope', fields.ChecksumScope || 'BFpilot app-manifest-v1'],
+          ['Files', fields.ChecksumFiles || '-'],
+          ['Checksum bytes', fields.ChecksumBytes ? shortSize(Number(fields.ChecksumBytes)) : '-']
+        );
+      }
+      if (fields.ShadowMountImage) {
+        const shadowRows = [
+          ['ShadowMount image', fields.ShadowMountImage],
+          ['ShadowMount config', fields.ShadowMountAutotune || '-']
+        ];
+        if (fields.ShadowMountAction) shadowRows.splice(1, 0,
+          ['ShadowMount action', fields.ShadowMountAction]);
+        if (fields.ShadowMountSector) shadowRows.splice(1, 0,
+          ['ShadowMount sector', fields.ShadowMountSector]);
+        if (fields.ShadowMountRemoved) shadowRows.push(
+          ['ShadowMount removed', fields.ShadowMountRemoved]);
+        rows.splice(3, 0, ...shadowRows);
+      }
+      if (fields.ArchiveAction) {
+        const archiveRows = [['Archive action', fields.ArchiveAction]];
+        if (fields.PatchTarget) archiveRows.push(['Patch target', fields.PatchTarget]);
+        if (fields.PatchRemovedExtra) archiveRows.push(['Removed extra', fields.PatchRemovedExtra]);
+        if (fields.PreparedTarget) archiveRows.push(['Prepared target', fields.PreparedTarget]);
+        rows.splice(3, 0, ...archiveRows);
+      }
       if (error && error !== 'none') rows.splice(3, 0, ['Error', error]);
-      if (homebrewApp) rows.splice(3, 0, ['Homebrew app', pathBaseName(targetPath)]);
+      if (prepareInfo && prepareInfo.found) {
+        rows.splice(3, 0, ['Homebrew app',
+          prepareInfo.titleId || pathBaseName(prepareInfo.appPath || targetPath)]);
+        rows.splice(4, 0, ['Preparation', prepareInfo.reason || '-']);
+        rows.splice(5, 0, ['Action', prepareActionLabel(prepareInfo)]);
+        const warning = prepareWarningText(prepareInfo);
+        if (warning) rows.splice(6, 0, ['Warning', warning]);
+      }
 
       const grid = document.createElement('div');
       grid.className = 'detail-grid';
@@ -1926,8 +2629,8 @@
         const prepare = document.createElement('button');
         prepare.type = 'button';
         prepare.className = 'primary';
-        prepare.textContent = 'Prepare for Homebrew';
-        prepare.addEventListener('click', () => prepareHomebrewFromActivity(log, fields));
+        prepare.textContent = prepareActionLabel(prepareInfo);
+        prepare.addEventListener('click', () => prepareHomebrewFromActivity(log, fields, prepareInfo));
         actions.appendChild(prepare);
       }
       if (actions.childNodes.length) body.appendChild(actions);
@@ -1965,7 +2668,7 @@
     function showExtractHelp() {
       showInfoModal('Extract Flow',
         'Extract streams ZIP/RAR upload and extraction at the same time to reduce space needed. ' +
-        'If a PS5 app is found, Activity shows Prepare for Homebrew.');
+        'Archives extract normally first. If a PS5 app is found, you can prepare it for Homebrew after extraction.');
     }
 
 
@@ -1982,6 +2685,7 @@
 
     function drawLogs() {
       const root = el('side-logs');
+      state.activityRenderKey = activityLogsRenderKey(state.logs);
       root.textContent = '';
 
       const toolbar = document.createElement('div');
@@ -2011,6 +2715,7 @@
       const list = document.createElement('div');
       list.className = 'log-list';
       root.appendChild(list);
+      const visibleLogs = state.logs.slice(0, ACTIVITY_RENDER_LIMIT);
 
       if (!state.logs.length) {
         const empty = document.createElement('div');
@@ -2019,7 +2724,7 @@
         list.appendChild(empty);
       }
 
-      for (const log of state.logs) {
+      for (const log of visibleLogs) {
         const row = document.createElement('button');
         row.type = 'button';
         const status = activityStatus(log);
@@ -2037,14 +2742,15 @@
         const main = document.createElement('span');
         main.className = 'log-main';
         const name = document.createElement('strong');
-        name.textContent = activityKindLabel(log.kind || log.operation) +
-          (log.displayName ? ' - ' + log.displayName : '');
+        name.textContent = activityRowTitle(log);
+        name.title = name.textContent;
         const target = document.createElement('span');
         target.textContent = (log.target || log.destPath) && (log.target || log.destPath) !== '-' ?
           (log.target || log.destPath) : (log.error || log.logName || log.name || '');
         const meta = document.createElement('span');
         meta.className = 'log-time';
         meta.textContent = activityMeta(log);
+        const timeInfo = activityTimeMeta(log);
         main.appendChild(name);
         main.appendChild(target);
         const warning = activityWarning(log);
@@ -2054,20 +2760,50 @@
           note.textContent = warning;
           main.appendChild(note);
         }
-        if (status === 'running' && Number(log.totalBytes || 0) > 0) {
-          const meter = document.createElement('span');
-          meter.className = 'activity-meter';
-          const fill = document.createElement('span');
-          fill.style.width = activityPercent(log).toFixed(1) + '%';
-          meter.appendChild(fill);
-          main.appendChild(meter);
+        const footer = document.createElement('span');
+        footer.className = 'activity-footer';
+        footer.appendChild(meta);
+        if (timeInfo) {
+          const timeRow = document.createElement('span');
+          timeRow.className = 'activity-time-row';
+          const started = document.createElement('span');
+          started.className = 'activity-start';
+          started.textContent = timeInfo.started;
+          const duration = document.createElement('span');
+          duration.className = 'activity-duration';
+          duration.innerHTML = iconSvg('clock');
+          const durationText = document.createElement('span');
+          durationText.textContent = timeInfo.duration;
+          duration.appendChild(durationText);
+          timeRow.appendChild(started);
+          timeRow.appendChild(duration);
+          footer.appendChild(timeRow);
         }
-        main.appendChild(meta);
+        main.appendChild(footer);
 
         row.appendChild(icon);
         row.appendChild(main);
         row.addEventListener('click', () => openLog(log));
         list.appendChild(row);
+      }
+
+      if (state.logs.length > visibleLogs.length) {
+        const more = document.createElement('div');
+        more.className = 'log-entry';
+        const icon = document.createElement('span');
+        icon.className = 'log-status-icon';
+        const main = document.createElement('span');
+        main.className = 'log-main';
+        const titleMore = document.createElement('strong');
+        titleMore.textContent = 'Showing newest ' + visibleLogs.length +
+          ' of ' + state.logs.length;
+        const note = document.createElement('span');
+        note.textContent = 'Clear finished Activity to remove old logs from /data/FileExplorer/logs.';
+        main.appendChild(titleMore);
+        main.appendChild(note);
+        more.appendChild(icon);
+        more.appendChild(main);
+        list.appendChild(more);
       }
 
       updatePlaces();
@@ -2079,15 +2815,33 @@
       drawLogs();
       renderLogModal(log, '', false, true);
       const name = log && (log.logName || log.name);
+      let content = '';
+      let truncated = false;
       if (name) {
         try {
           const data = await api('/api/fs/logs/read?name=' + encodeURIComponent(name));
-          renderLogModal(log, data.content || '', data.truncated, false);
+          content = data.content || '';
+          truncated = !!data.truncated;
         } catch (err) {
-          renderLogModal(log, '', false, false);
+          content = '';
+          truncated = false;
         }
-      } else {
-        renderLogModal(log, '', false, false);
+      }
+      renderLogModal(log, content, truncated, false);
+      const fields = parseOperationLog(content);
+      const queueStatus = log && log.source !== 'log' ? activityStatus(log) : '';
+      const result = queueStatus && queueStatus !== 'unknown' ? queueStatus :
+        (fields.Result || activityStatus(log));
+      const operation = fields.Operation || activityKindLabel((log && (log.kind || log.operation)) || '');
+      const targetPath = activityTargetPath(log, fields);
+      if (result === 'success' && isArchiveActivity(log, fields, operation) && targetPath) {
+        try {
+          const info = await probePrepareApp(targetPath);
+          if ((log.queueId || log.name) === state.selectedLog &&
+              !el('log-modal').classList.contains('hidden')) {
+            renderLogModal(log, content, truncated, false, info);
+          }
+        } catch (err) {}
       }
     }
 
@@ -2097,16 +2851,28 @@
       if (opts.activate !== false) setSideMode('activity');
       if (!opts.preserveSelection) state.selectedLog = '';
       if (!opts.quiet) showLogsLoading();
+      const showActivity = opts.activate !== false || state.sideMode === 'activity';
+      const includeLogs = opts.includeLogs !== false && showActivity;
       try {
         const data = await api('/api/fs/activity/poll?clientId=' +
           encodeURIComponent(activityClientId()) + '&owned=' +
-          encodeURIComponent(activityOwnedIds()));
-        state.logs = sortActivityItems(data.items || []);
-        drawLogs();
+          encodeURIComponent(activityOwnedIds()) + '&logs=' +
+          encodeURIComponent(includeLogs ? '1' : '0') + '&limit=' +
+          encodeURIComponent(String(ACTIVITY_LOG_FETCH_LIMIT)));
+        const nextLogs = sortActivityItems(data.items || []);
+        const shouldDraw = showActivity || !opts.quiet;
+        const nextRenderKey = shouldDraw ? activityLogsRenderKey(nextLogs) : '';
+        state.logs = nextLogs;
+        trackActivityFileEvents(state.logs);
+        if (shouldDraw && (!opts.quiet || nextRenderKey !== state.activityRenderKey)) {
+          state.activityRenderKey = nextRenderKey;
+          drawLogs();
+        }
         if (data.start) startQueuedActivity(data.start);
       } catch (err) {
         if (!opts.quiet) {
           state.logs = [];
+          state.activityRenderKey = '';
           drawLogs();
           toast('activity: ' + err.message, 'err');
         }
@@ -2120,6 +2886,9 @@
         const result = await api('/api/fs/activity/clear');
         state.logs = [];
         state.selectedLog = '';
+        state.activityRenderKey = '';
+        state.activityStatusSeen.clear();
+        state.activityEventsPrimed = false;
         closeLogModal();
         drawLogs();
         toast('Removed ' + Number(result.removed || 0) + ' finished log file(s)', 'ok');
@@ -2173,29 +2942,25 @@
     }
 
 
-    function isHomebrewAppPath(path) {
-      return /^PPSA[0-9A-Z]{5}-app$/i.test(pathBaseName(path));
-    }
-
-
-    function canPrepareHomebrew(item, fields, result, operation) {
+    function canPrepareHomebrew(item, fields, result, operation, prepareInfo) {
       return result === 'success' &&
         isArchiveActivity(item, fields, operation) &&
-        isHomebrewAppPath(activityTargetPath(item, fields));
+        !!(prepareInfo && prepareInfo.found && !prepareInfo.prepared);
     }
 
 
-    async function prepareHomebrewFromActivity(item, fields) {
-      const path = activityTargetPath(item, fields);
-      if (!path || !isHomebrewAppPath(path)) {
-        toast('No prepared app folder was found for this activity', 'err');
+    async function prepareHomebrewFromActivity(item, fields, prepareInfo) {
+      const path = (prepareInfo && (prepareInfo.scanPath || prepareInfo.appPath)) ||
+        activityTargetPath(item, fields);
+      if (!path) {
+        toast('No app folder was found for this activity', 'err');
         return;
       }
       try {
-        setJobBox('chmod', 'Preparing for Homebrew', 0);
-        await api('/api/fs/chmod777?path=' + encodeURIComponent(path));
+        const result = await startHomebrewPrepare(path, prepareInfo);
         closeLogModal();
-        toast('Homebrew preparation started', 'ok');
+        toast(result.background ? prepareActionLabel(prepareInfo) + ' started' :
+          'Homebrew app is already prepared', 'ok');
         scheduleLogsReveal();
       } catch (err) {
         toast('prepare: ' + err.message, 'err');
@@ -2242,9 +3007,9 @@
     }
 
 
-    async function activityComplete(queue, status, error, copied, total, done, failed) {
+    async function activityComplete(queue, status, error, copied, total, done, failed, options) {
       if (!queue || !queue.queueId || !queue.leaseToken) return;
-      const url = '/api/fs/activity/complete?queueId=' + encodeURIComponent(queue.queueId) +
+      let url = '/api/fs/activity/complete?queueId=' + encodeURIComponent(queue.queueId) +
         '&leaseToken=' + encodeURIComponent(queue.leaseToken) +
         '&status=' + encodeURIComponent(status || 'failed') +
         '&error=' + encodeURIComponent(error || '') +
@@ -2252,7 +3017,55 @@
         '&total=' + encodeURIComponent(String(Math.max(0, Math.round(total || 0)))) +
         '&done=' + encodeURIComponent(String(Math.max(0, Math.round(done || 0)))) +
         '&failed=' + encodeURIComponent(String(Math.max(0, Math.round(failed || 0))));
+      if (options && options.logName) url += '&logName=' + encodeURIComponent(options.logName);
+      if (options && options.current) url += '&current=' + encodeURIComponent(options.current);
+      if (options && options.extra) url += '&extra=' + encodeURIComponent(options.extra);
       await api(url).catch(() => {});
+    }
+
+
+    function archiveDecisionMeta(decision, result) {
+      const info = decision && decision.info;
+      const target = (info && info.preparedPath) || (result && result.path) || '';
+      if (decision && decision.action === 'patchStarted') {
+        return {
+          current: 'Patch apply started',
+          extra: [
+            'ArchiveAction: Patch apply started',
+            target ? 'PatchTarget: ' + target : '',
+            info && info.deleteExtraSample ? 'PatchRemovedExtra: ' + info.deleteExtraSample : ''
+          ].filter(Boolean).join('\n')
+        };
+      }
+      if (decision && decision.action === 'appliedPatch') {
+        return {
+          current: 'Applied as patch',
+          extra: [
+            'ArchiveAction: Applied as patch',
+            target ? 'PatchTarget: ' + target : '',
+            info && info.deleteExtraSample ? 'PatchRemovedExtra: ' + info.deleteExtraSample : ''
+          ].filter(Boolean).join('\n')
+        };
+      }
+      if (decision && decision.action === 'prepared') {
+        return {
+          current: 'Prepared executable',
+          extra: [
+            'ArchiveAction: Prepared executable',
+            target ? 'PreparedTarget: ' + target : ''
+          ].filter(Boolean).join('\n')
+        };
+      }
+      if (decision && decision.action === 'keep') {
+        return {
+          current: 'Kept extracted files as is',
+          extra: 'ArchiveAction: Kept as is'
+        };
+      }
+      return {
+        current: 'Extracted archive',
+        extra: ''
+      };
     }
 
 
@@ -2425,6 +3238,7 @@
           state.activeLeaseToken = '';
           finishLocalActivity(item, result.status);
           refreshLogs({ activate: true, preserveSelection: true, quiet: true });
+          scheduleFileRefresh(250);
         }
       })();
     }
@@ -2521,6 +3335,7 @@
           await waitJobIdle().catch(() => {});
           await openPath(dest).catch(() => refresh());
           toast('Extracted to ' + (result.path || dest), 'ok');
+          await maybeOfferAppPrepare(result.path || dest);
           scheduleLogsReveal();
           return;
         } catch (err) {
@@ -2571,18 +3386,28 @@
         return;
       }
 
-      if (error || !backups || !backups.length) {
-        const pre = document.createElement('pre');
-        pre.className = 'log-content';
-        pre.textContent = error || 'No backups were found for this folder.';
-        body.appendChild(pre);
-        modal.classList.remove('hidden');
-        return;
-      }
+	      if (error || !backups || !backups.length) {
+	        const pre = document.createElement('pre');
+	        pre.className = 'log-content';
+	        pre.textContent = error || 'No backups were found for this folder.';
+	        body.appendChild(pre);
+	        modal.classList.remove('hidden');
+	        return;
+	      }
 
-      const list = document.createElement('div');
-      list.className = 'backup-list';
-      backups.forEach((backup) => {
+      const actions = document.createElement('div');
+      actions.className = 'modal-actions';
+      const removeAll = document.createElement('button');
+      removeAll.type = 'button';
+      removeAll.className = 'danger';
+      removeAll.textContent = 'Remove All Backups';
+      removeAll.addEventListener('click', () => removeAllBackups(entry, backups.length));
+      actions.appendChild(removeAll);
+      body.appendChild(actions);
+	
+	      const list = document.createElement('div');
+	      list.className = 'backup-list';
+	      backups.forEach((backup) => {
         const item = document.createElement('div');
         item.className = 'backup-item';
         const meta = document.createElement('div');
@@ -2597,13 +3422,22 @@
         meta.appendChild(detail);
         const restore = document.createElement('button');
         restore.type = 'button';
-        restore.className = 'primary';
-        restore.textContent = 'Restore';
-        restore.addEventListener('click', () => restoreBackup(entry, backup));
-        item.appendChild(meta);
-        item.appendChild(restore);
-        list.appendChild(item);
-      });
+	        restore.className = 'primary';
+	        restore.textContent = 'Restore';
+	        restore.addEventListener('click', () => restoreBackup(entry, backup));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'danger';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => removeBackup(entry, backup));
+        const itemActions = document.createElement('div');
+        itemActions.className = 'backup-item-actions';
+        itemActions.appendChild(restore);
+        itemActions.appendChild(remove);
+	        item.appendChild(meta);
+	        item.appendChild(itemActions);
+	        list.appendChild(item);
+	      });
       body.appendChild(list);
       modal.classList.remove('hidden');
     }
@@ -2620,9 +3454,9 @@
       }
     }
 
-    async function restoreBackup(entry, backup) {
-      if (!entry || !entry.dir || !backup || !backup.id) return;
-      const target = joinPath(state.path, entry.name);
+	    async function restoreBackup(entry, backup) {
+	      if (!entry || !entry.dir || !backup || !backup.id) return;
+	      const target = joinPath(state.path, entry.name);
       try {
         setJobBox('restore', 'Restoring backup', 0);
         await api('/api/fs/backups/restore?path=' + encodeURIComponent(target) +
@@ -2636,11 +3470,45 @@
       } finally {
         setTimeout(() => {
           if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
-        }, 900);
+	        }, 900);
+	      }
+	    }
+
+    async function removeBackup(entry, backup) {
+      if (!entry || !entry.dir || !backup || !backup.id) return;
+      const label = backup.archive || backup.id || 'this backup';
+      if (!confirm('Remove backup ' + label + '? This cannot be undone.')) return;
+      const target = joinPath(state.path, entry.name);
+      try {
+        await api('/api/fs/backups/remove?path=' + encodeURIComponent(target) +
+          '&id=' + encodeURIComponent(backup.id));
+        toast('Backup removed', 'ok');
+        await refresh();
+        await openRestoreBackup(entry);
+      } catch (err) {
+        toast('remove backup: ' + err.message, 'err');
       }
     }
 
-    function openEntry(entry) {
+    async function removeAllBackups(entry, count) {
+      if (!entry || !entry.dir) return;
+      const total = Number(count || backupCount(entry) || 0);
+      if (!confirm('Remove ' + total + ' backup' + (total === 1 ? '' : 's') +
+        ' for ' + entry.name + '? This cannot be undone.')) return;
+      const target = joinPath(state.path, entry.name);
+      try {
+        const result = await api('/api/fs/backups/remove?path=' +
+          encodeURIComponent(target) + '&all=1');
+        closeLogModal();
+        toast('Removed ' + Number(result.removed || 0) + ' backup' +
+          (Number(result.removed || 0) === 1 ? '' : 's'), 'ok');
+        await refresh();
+      } catch (err) {
+        toast('remove backups: ' + err.message, 'err');
+      }
+    }
+
+	    function openEntry(entry) {
       const next = joinPath(state.path, entry.name);
       if (entry.dir) {
         openPath(next);
@@ -2679,8 +3547,14 @@
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v5H5z"></path><path d="M7 9v11h10V9"></path><path d="M12 5v11"></path><path d="m8.5 12.5 3.5 3.5 3.5-3.5"></path></svg>';
       case 'extract':
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v5H5z"></path><path d="M7 9v11h10V9"></path><path d="M12 11v6"></path><path d="m9.5 14.5 2.5 2.5 2.5-2.5"></path></svg>';
+      case 'compress':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h5"></path><path d="M8 12h8"></path><path d="m10 9-2 3 2 3"></path><path d="m14 9 2 3-2 3"></path></svg>';
+      case 'checksum':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3 8 21"></path><path d="m16 3-2 18"></path></svg>';
       case 'backup':
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3 2"></path></svg>';
+      case 'clock':
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>';
       case 'permissions':
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V8a4 4 0 0 1 8 0v3"></path><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M9 16h6"></path><path d="M12 13v6"></path></svg>';
       default:
@@ -2746,7 +3620,7 @@
       button.addEventListener('click', (event) => {
         event.stopPropagation();
         closeRowMenus();
-        handler();
+        handler(event);
       });
       return button;
     }
@@ -2809,6 +3683,9 @@
       if (!entry.dir && localArchiveKind(entry.name)) {
         menu.appendChild(makeMenuButton('extract', 'Extract', () => extractLocalArchive(entry)));
       }
+      if (!entry.dir && entry.decompressible) {
+        menu.appendChild(makeMenuButton('extract', 'Decompress...', () => openCompressionModal('decompress', entry)));
+      }
       if (entry.dir && backupCount(entry) > 0) {
         const backup = document.createElement('button');
         backup.type = 'button';
@@ -2821,11 +3698,19 @@
           closeRowMenus();
           openRestoreBackup(entry);
         });
-        actions.appendChild(backup);
-        menu.appendChild(makeMenuButton('backup', 'Restore Backup', () => openRestoreBackup(entry)));
-      }
+	        actions.appendChild(backup);
+	        menu.appendChild(makeMenuButton('backup', 'Restore Backup', () => openRestoreBackup(entry)));
+	        menu.appendChild(makeMenuButton('delete', 'Remove Backups',
+            () => removeAllBackups(entry, backupCount(entry)), 'danger'));
+	      }
       if (entry.dir) {
+        if (entry.compressible) {
+          menu.appendChild(makeMenuButton('compress', 'Compress...', () => openCompressionModal('compress', entry)));
+        }
+        menu.appendChild(makeMenuButton('checksum', 'Checksum', () => checksumApp(entry)));
         menu.appendChild(makeMenuButton('permissions', 'Make Executable', () => chmodEntry(entry)));
+      } else {
+        menu.appendChild(makeMenuButton('checksum', 'Checksum', () => checksumApp(entry)));
       }
       menu.appendChild(makeMenuButton('download', 'Download', () => downloadEntry(entry)));
       menu.appendChild(makeMenuButton('rename', 'Rename', () => renameEntry(entry)));
@@ -2879,6 +3764,7 @@
       menu.setAttribute('role', 'menu');
       menu.appendChild(makeMenuButton('rename', 'Rename', renameOne));
       menu.appendChild(makeMenuButton('download', 'Download', downloadSelected));
+      menu.appendChild(makeMenuButton('checksum', 'Checksum', checksumSelected));
       menu.appendChild(makeMenuButton('delete', 'Delete', deleteSelected, 'danger'));
 
       menu.addEventListener('keydown', (event) => {
@@ -3092,22 +3978,33 @@
       list.appendChild(row);
     }
 
-    async function refresh() {
-      state.path = cleanPath(el('path').value || state.path);
-      el('path').value = state.path;
+    async function refresh(pathOverride, options) {
+      const requestedPath = typeof pathOverride === 'string' ?
+        pathOverride : (el('path').value || state.path);
+      const paths = [cleanPath(requestedPath)];
+      const fallbackPath = options && options.fallbackPath ?
+        cleanPath(options.fallbackPath) : '';
+      if (fallbackPath && fallbackPath !== paths[0]) paths.push(fallbackPath);
       showLoading();
 
-      try {
-        const data = await api('/api/fs/list?path=' + encodeURIComponent(state.path));
-        state.entries = sortEntries(data.entries || []);
-        state.selected.clear();
-        saveLastPath(state.path);
-        drawList();
-      } catch (err) {
-        state.entries = [];
-        drawList();
-        toast(err.message, 'err');
+      let lastError = null;
+      for (const path of paths) {
+        state.path = path;
+        el('path').value = state.path;
+        try {
+          const data = await api('/api/fs/list?path=' + encodeURIComponent(state.path));
+          state.entries = sortEntries(data.entries || []);
+          state.selected.clear();
+          saveLastPath(state.path);
+          drawList();
+          return;
+        } catch (err) {
+          lastError = err;
+        }
       }
+      state.entries = [];
+      drawList();
+      toast(lastError ? lastError.message : 'refresh failed', 'err');
     }
 
     async function openPath(path) {
@@ -3238,6 +4135,33 @@
       downloadEntry(entries[0]);
     }
 
+    async function checksumSelected() {
+      const entries = selectedEntries();
+      if (entries.length !== 1) {
+        toast('Select one item', 'err');
+        return;
+      }
+      await checksumApp(entries[0]);
+    }
+
+    async function checksumApp(entry) {
+      if (!entry) {
+        toast('Select one item', 'err');
+        return;
+      }
+      const path = joinPath(state.path, entry.name);
+      try {
+        setSideMode('activity');
+        const result = await api('/api/fs/app-checksum?path=' + encodeURIComponent(path));
+        toast('Checksum started: ' + entry.name, 'ok');
+        if (result.logName) state.selectedLog = 'log:' + result.logName;
+        scheduleLogsReveal();
+      } catch (err) {
+        toast('checksum: ' + err.message, 'err');
+        scheduleLogsReveal();
+      }
+    }
+
     async function chmodEntry(entry) {
       if (!entry || !entry.dir) {
         toast('Select one folder', 'err');
@@ -3252,6 +4176,264 @@
       } catch (err) {
         toast('permissions: ' + err.message, 'err');
         scheduleLogsReveal();
+      }
+    }
+
+    function selectedRadioValue(name, fallback) {
+      const checked = document.querySelector('input[name="' + name + '"]:checked');
+      return checked ? checked.value : fallback;
+    }
+
+    function syncChoiceOptionStates() {
+      document.querySelectorAll('.choice-option').forEach((label) => {
+        const input = label.querySelector('input[type="radio"]');
+        if (!input) return;
+        const checked = !!input.checked;
+        label.classList.toggle('is-selected', checked);
+        label.setAttribute('aria-checked', checked ? 'true' : 'false');
+      });
+    }
+
+    function visibleChoiceOptions(group) {
+      return Array.from((group || document).querySelectorAll('.choice-option'))
+        .filter((option) => {
+          const input = option.querySelector('input[type="radio"]');
+          return input && option.offsetParent !== null;
+        });
+    }
+
+    function selectChoiceOption(option) {
+      const input = option && option.querySelector('input[type="radio"]');
+      if (!input || input.checked) {
+        syncChoiceOptionStates();
+        updateCompressionRisk();
+        return;
+      }
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      syncChoiceOptionStates();
+      updateCompressionRisk();
+    }
+
+    function focusChoiceNeighbor(option, direction) {
+      const group = option && option.closest('.choice-grid');
+      const choices = visibleChoiceOptions(group);
+      const index = choices.indexOf(option);
+      if (index < 0 || choices.length < 2) return;
+      const next = choices[(index + direction + choices.length) % choices.length];
+      next.focus();
+    }
+
+    function setupChoiceOptions() {
+      document.querySelectorAll('.choice-option').forEach((label) => {
+        const input = label.querySelector('input[type="radio"]');
+        if (!input || label.dataset.choiceReady === '1') return;
+        label.dataset.choiceReady = '1';
+        label.tabIndex = 0;
+        label.setAttribute('role', 'radio');
+        input.tabIndex = -1;
+        input.addEventListener('change', () => {
+          syncChoiceOptionStates();
+          updateCompressionRisk();
+        });
+        label.addEventListener('click', () => {
+          setTimeout(() => {
+            syncChoiceOptionStates();
+            updateCompressionRisk();
+          }, 0);
+        });
+        label.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectChoiceOption(label);
+            return;
+          }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            focusChoiceNeighbor(label, 1);
+            return;
+          }
+          if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            focusChoiceNeighbor(label, -1);
+          }
+        });
+      });
+      syncChoiceOptionStates();
+    }
+
+    function resetCompressionModalDefaults(mode) {
+      const pfs = document.querySelector('input[name="compression-format"][value="pfs"]');
+      const keep = document.querySelector('input[name="compression-delete"][value="keep"]');
+      if (pfs) pfs.checked = true;
+      if (keep) keep.checked = true;
+      el('compression-format-section').classList.toggle('hidden', mode !== 'compress');
+      el('compression-source-title').textContent =
+        mode === 'compress' ? 'Source Handling' : 'Compressed Image Handling';
+      el('compression-modal-start').textContent =
+        mode === 'compress' ? 'Start Compression' : 'Start Decompression';
+      syncChoiceOptionStates();
+    }
+
+    function updateCompressionRisk() {
+      const modalState = state.compressionModal;
+      const mode = modalState ? modalState.mode : 'compress';
+      const policy = selectedRadioValue('compression-delete', 'keep');
+      const risk = el('compression-risk');
+      if (policy === 'keep') {
+        risk.classList.add('hidden');
+        risk.textContent = '';
+        return;
+      }
+      if (policy === 'after') {
+        risk.textContent = mode === 'compress'
+          ? 'The app folder is removed only after the .ffpfsc is fully written and renamed. If the job fails before that point, the source folder stays in place.'
+          : 'The .ffpfsc is removed only after the app folder is fully extracted and renamed. If the job fails before that point, the compressed image stays in place.';
+      } else {
+        risk.textContent = mode === 'compress'
+          ? 'Destructive streaming deletes source files while compression progresses. Failed, cancelled, or interrupted conversion can leave a partial app folder and .ffpfsc.tmp with no rollback.'
+          : 'Destructive streaming extracts in reverse and truncates the .ffpfsc while decompression progresses. Failed, cancelled, or interrupted conversion can leave partial output and a truncated source image.';
+      }
+      risk.classList.remove('hidden');
+    }
+
+    function openCompressionModal(mode, entry) {
+      if (mode === 'compress' && (!entry || !entry.dir || !entry.compressible)) {
+        toast('Select a compressible app folder', 'err');
+        return;
+      }
+      if (mode === 'decompress' && (!entry || entry.dir || !entry.decompressible)) {
+        toast('Select a compressed app image', 'err');
+        return;
+      }
+      state.compressionModal = { mode, entry };
+      resetCompressionModalDefaults(mode);
+      el('compression-modal-title').textContent =
+        (mode === 'compress' ? 'Compress ' : 'Decompress ') + entry.name;
+      el('compression-modal-subtitle').textContent = mode === 'compress'
+        ? 'Choose the nested image format and what to do with the app folder.'
+        : 'The nested image type is detected automatically. Choose what to do with the compressed source.';
+      updateCompressionRisk();
+      el('compression-modal').classList.remove('hidden');
+      setTimeout(() => {
+        const target = mode === 'compress'
+          ? document.querySelector('#compression-format-section .choice-option.is-selected')
+          : document.querySelector('#compression-delete-grid .choice-option.is-selected');
+        if (target) target.focus();
+      }, 0);
+    }
+
+    function closeCompressionModal() {
+      el('compression-modal').classList.add('hidden');
+      state.compressionModal = null;
+    }
+
+    async function startCompressionModal() {
+      const modalState = state.compressionModal;
+      if (!modalState) return;
+      const entry = modalState.entry;
+      const mode = modalState.mode;
+      const options = {
+        format: selectedRadioValue('compression-format', 'pfs'),
+        deletePolicy: selectedRadioValue('compression-delete', 'keep')
+      };
+      closeCompressionModal();
+      if (mode === 'compress') await compressApp(entry, false, options);
+      else await decompressApp(entry, false, options);
+    }
+
+    async function compressApp(entry, overwrite, options) {
+      let format = 'pfs';
+      let deletePolicy = 'keep';
+      if (typeof options === 'boolean') {
+        deletePolicy = options ? 'stream' : 'keep';
+      } else if (options) {
+        format = options.format || 'pfs';
+        deletePolicy = options.deletePolicy || 'keep';
+      }
+      if (!entry || !entry.dir || !entry.compressible) {
+        toast('Select a compressible app folder', 'err');
+        return;
+      }
+
+      const path = joinPath(state.path, entry.name);
+      const output = entry.compressOutput || '';
+      if (!overwrite && entry.compressOutputExists) {
+        const label = output ? output.slice(output.lastIndexOf('/') + 1) : 'existing output';
+        if (!confirm('Replace ' + label + '?')) return;
+      }
+
+      try {
+        setSideMode('activity');
+        setJobBox('compress', deletePolicy === 'keep' ? 'Starting compression' : 'Starting conversion', 0);
+        let url = '/api/fs/app-compress?path=' +
+          encodeURIComponent(path) + '&overwrite=' + (overwrite ? '1' : '0') +
+          '&format=' + encodeURIComponent(format) +
+          '&delete=' + encodeURIComponent(deletePolicy);
+        const result = await api(url);
+        toast((deletePolicy === 'keep' ? 'Compression' : 'Conversion') + ' started: ' +
+          ((result.output || output || '').slice((result.output || output || '').lastIndexOf('/') + 1) ||
+            entry.name), 'ok');
+        setTimeout(() => {
+          if (state.jobTimer) return;
+          pollJob();
+        }, 150);
+      } catch (err) {
+        if (!overwrite && /output exists/i.test(err.message || '') &&
+          confirm('Replace existing compressed image?')) {
+          entry.compressOutputExists = true;
+          return compressApp(entry, true, { format, deletePolicy });
+        }
+        toast((deletePolicy === 'keep' ? 'compress' : 'convert') + ': ' + err.message, 'err');
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 1200);
+      }
+    }
+
+    async function decompressApp(entry, overwrite, options) {
+      let deletePolicy = 'keep';
+      if (typeof options === 'boolean') {
+        deletePolicy = options ? 'stream' : 'keep';
+      } else if (options) {
+        deletePolicy = options.deletePolicy || 'keep';
+      }
+      if (!entry || entry.dir || !entry.decompressible) {
+        toast('Select a compressed app image', 'err');
+        return;
+      }
+
+      const path = joinPath(state.path, entry.name);
+      const output = entry.decompressOutput || '';
+      if (!overwrite && entry.decompressOutputExists) {
+        const label = output ? output.slice(output.lastIndexOf('/') + 1) : 'existing output';
+        if (!confirm('Replace ' + label + '?')) return;
+      }
+
+      try {
+        setSideMode('activity');
+        setJobBox('decompress', deletePolicy === 'keep' ? 'Starting decompression' : 'Starting conversion', 0);
+        let url = '/api/fs/app-decompress?path=' +
+          encodeURIComponent(path) + '&overwrite=' + (overwrite ? '1' : '0') +
+          '&delete=' + encodeURIComponent(deletePolicy);
+        const result = await api(url);
+        toast((deletePolicy === 'keep' ? 'Decompression' : 'Conversion') + ' started: ' +
+          ((result.output || output || '').slice((result.output || output || '').lastIndexOf('/') + 1) ||
+            entry.name), 'ok');
+        setTimeout(() => {
+          if (state.jobTimer) return;
+          pollJob();
+        }, 150);
+      } catch (err) {
+        if (!overwrite && /output exists/i.test(err.message || '') &&
+          confirm('Replace existing app folder?')) {
+          entry.decompressOutputExists = true;
+          return decompressApp(entry, true, { deletePolicy });
+        }
+        toast((deletePolicy === 'keep' ? 'decompress' : 'convert') + ': ' + err.message, 'err');
+        setTimeout(() => {
+          if (!state.uploadBusy && !state.jobTimer) el('job').classList.remove('show');
+        }, 1200);
       }
     }
 
@@ -3478,11 +4660,6 @@
       return path.slice(prefix.length + 1);
     }
 
-    function appFolderFromSegment(segment) {
-      const match = /^PPSA([0-9A-Z]{5})-app$/i.exec(segment || '');
-      return match ? 'PPSA' + match[1].toUpperCase() + '-app' : '';
-    }
-
     function findZipEocd(bytes) {
       for (let i = bytes.length - 22; i >= 0; i--) {
         if (bytes[i] !== 0x50 || bytes[i + 1] !== 0x4b ||
@@ -3593,75 +4770,26 @@
       });
     }
 
-    function chooseZipLayout(file, entries) {
-      const appCandidates = [];
-      for (const entry of entries) {
-        const parts = entry.path.split('/');
-        for (let i = 0; i < parts.length; i++) {
-          const destFolder = appFolderFromSegment(parts[i]);
-          if (!destFolder) continue;
-          const prefix = parts.slice(0, i + 1).join('/');
-          if (!appCandidates.some((candidate) => candidate.extractPrefix === prefix)) {
-            appCandidates.push({
-              destFolder,
-              extractPrefix: prefix,
-              stripPrefix: prefix
-            });
-          }
-        }
-      }
-      if (appCandidates.length) {
-        appCandidates.sort((a, b) => {
-          const aEboot = entries.some((entry) => entry.path.toLowerCase() ===
-            (a.extractPrefix + '/eboot.bin').toLowerCase());
-          const bEboot = entries.some((entry) => entry.path.toLowerCase() ===
-            (b.extractPrefix + '/eboot.bin').toLowerCase());
-          if (aEboot !== bEboot) return aEboot ? -1 : 1;
-          if (a.extractPrefix.length !== b.extractPrefix.length) {
-            return a.extractPrefix.length - b.extractPrefix.length;
-          }
-          return a.extractPrefix.localeCompare(b.extractPrefix);
-        });
-        return appCandidates[0];
-      }
-
-      const title = /PPSA[0-9A-Z]{5}/i.exec(file.name || '');
-      if (!title) {
-        throw new Error('No PPSA title ID found in zip name or app folder');
-      }
-      const destFolder = title[0].toUpperCase() + '-app';
-      const eboots = entries.filter((entry) => {
-        const parts = entry.path.split('/');
-        return !entry.isDir && parts[parts.length - 1].toLowerCase() === 'eboot.bin';
-      }).sort((a, b) => {
-        const aParent = parentArchivePath(a.path);
-        const bParent = parentArchivePath(b.path);
-        const aDepth = aParent ? aParent.split('/').length : 0;
-        const bDepth = bParent ? bParent.split('/').length : 0;
-        if (aDepth !== bDepth) return aDepth - bDepth;
-        return a.path.localeCompare(b.path);
-      });
-      if (!eboots.length) {
-        throw new Error('No eboot.bin found to place inside ' + destFolder);
-      }
-      const parent = parentArchivePath(eboots[0].path);
-      return {
-        destFolder,
-        stripPrefix: parent,
-        extractPrefix: parent
-      };
-    }
-
-    function parentArchivePath(path) {
-      const index = path.lastIndexOf('/');
-      return index < 0 ? '' : path.slice(0, index);
+    function archiveOutputFolderName(name) {
+      let base = String(name || 'archive').split(/[\\/]/).pop() || 'archive';
+      base = base.replace(/\.part001\.rar$/i, '')
+        .replace(/\.(zip|rar)$/i, '')
+        .replace(/[^A-Za-z0-9._-]/g, '_')
+        .replace(/\.+$/g, '');
+      if (!base) base = 'archive';
+      if (base.length > 180) base = base.slice(0, 180).replace(/\.+$/g, '') || 'archive';
+      return base;
     }
 
     async function planZipUpload(file) {
       const entries = await readZipDirectory(file);
-      const plan = chooseZipLayout(file, entries);
+      const plan = {
+        destFolder: archiveOutputFolderName(file && file.name),
+        stripPrefix: '',
+        extractPrefix: ''
+      };
       const selected = selectedZipEntries(entries, plan);
-      if (!selected.length) throw new Error('Zip contained no matching files');
+      if (!selected.length) throw new Error('Zip contained no files');
       for (const entry of selected) {
         if (entry.flags & ZIP_FLAG_ENCRYPTED) {
           throw new Error('Encrypted zip entries are not supported');
@@ -3684,6 +4812,7 @@
       if (plan.destFolder) url += '&destFolder=' + encodeURIComponent(plan.destFolder);
       if (plan.stripPrefix) url += '&stripPrefix=' + encodeURIComponent(plan.stripPrefix);
       if (plan.extractPrefix) url += '&extractPrefix=' + encodeURIComponent(plan.extractPrefix);
+      if (queue) url += '&deferActivity=1';
       url += activityLeaseExtra(queue);
       return url;
     }
@@ -3698,6 +4827,7 @@
       setJobBox('unzip', 'Inspecting zip', 0);
       let finalStatus = 'success';
       let finalError = '';
+      let result = null;
 
       try {
         const plan = queue && queue.plan ? queue.plan : await planZipUpload(file);
@@ -3713,17 +4843,35 @@
           if (state.uploadBusy && state.uploadJobCancel) pollJob();
         }, 150);
 
-        const result = await upload;
+        result = await upload;
         const done = await waitJobIdle();
         if (done.error) throw new Error(done.error);
         await refresh();
-        toast('Extracted ' + Number(result.files || plan.files || 0) + ' file(s)', 'ok');
+        const decision = await maybeOfferAppPrepare(result.path, {
+          wait: true,
+          inline: true
+        });
+        const meta = archiveDecisionMeta(decision, result);
+        if (queue && result.activityDeferred) {
+          await activityComplete(queue, 'success', '',
+            file.size || 0, file.size || 0,
+            Number(result.files || plan.files || 0), 0, {
+              logName: result.logName || '',
+              current: meta.current,
+              extra: meta.extra
+            });
+        }
+        toast(meta.current === 'Extracted archive' ?
+          ('Extracted ' + Number(result.files || plan.files || 0) + ' file(s)') :
+          meta.current, 'ok');
       } catch (err) {
         finalStatus = state.uploadAbort || isCancelledError(err.message) ? 'cancelled' : 'failed';
         finalError = finalStatus === 'cancelled' ? 'upload cancelled' : err.message;
         if (queue) {
           await activityComplete(queue, finalStatus,
-            finalError, 0, file.size || 0, 0, 1);
+            finalError, 0, file.size || 0, 0, 1, {
+              logName: (result && result.logName) || ''
+            });
         }
         if (state.uploadAbort || isCancelledError(err.message)) {
           toast('Zip upload cancelled', 'err');
@@ -3873,6 +5021,7 @@
     function rarUploadUrl(file, basePath, queue) {
       return '/api/fs/upload-rar?path=' + encodeURIComponent(basePath) +
         '&filename=' + encodeURIComponent(file.name) +
+        (queue ? '&deferActivity=1' : '') +
         activityLeaseExtra(queue);
     }
 
@@ -3950,13 +5099,32 @@
         }
 
         await refresh();
-        toast('Extracted ' + Number(result.files || 0) + ' file(s)', 'ok');
+        const decision = await maybeOfferAppPrepare(result && result.path, {
+          wait: true,
+          inline: true
+        });
+        const meta = archiveDecisionMeta(decision, result);
+        if (queue && result && result.activityDeferred) {
+          await activityComplete(queue, 'success', '',
+            (queue && queue.totalBytes) || 0,
+            (queue && queue.totalBytes) || 0,
+            Number(result.files || 0), 0, {
+              logName: result.logName || '',
+              current: meta.current,
+              extra: meta.extra
+            });
+        }
+        toast(meta.current === 'Extracted archive' ?
+          ('Extracted ' + Number(result.files || 0) + ' file(s)') :
+          meta.current, 'ok');
       } catch (err) {
         finalStatus = state.uploadAbort || isCancelledError(err.message) ? 'cancelled' : 'failed';
         finalError = finalStatus === 'cancelled' ? 'upload cancelled' : err.message;
         if (queue) {
           await activityComplete(queue, finalStatus,
-            finalError, 0, (queue && queue.totalBytes) || 0, 0, 1);
+            finalError, 0, (queue && queue.totalBytes) || 0, 0, 1, {
+              logName: (result && result.logName) || ''
+            });
         }
         if (state.uploadAbort || isCancelledError(err.message)) {
           toast('RAR upload cancelled', 'err');
@@ -4141,7 +5309,10 @@
             state.jobTimer = 0;
             if (job.error) toast(job.error, 'err');
             else scheduleLogsReveal();
-            setTimeout(() => box.classList.remove('show'), 1400);
+            scheduleFileRefresh(250);
+            setTimeout(() => {
+              if (!state.preparePromptWaiting) box.classList.remove('show');
+            }, 1400);
           }
         } catch (err) {
           missed++;
@@ -4158,10 +5329,12 @@
 
     async function boot() {
       state.path = loadLastPath();
+      state.sideMode = loadSideMode();
       el('path').value = state.path;
       decorateIconButtons();
       attachBulkMenu();
       pollControllerState();
+      setSideMode(state.sideMode, { persist: false });
 
       const placeRoot = el('places');
       const extra = [];
@@ -4246,6 +5419,8 @@
         }
         fetch('/api/fs/job/cancel').catch(() => {});
       });
+      el('prepare-keep').addEventListener('click', keepPreparePrompt);
+      el('prepare-now').addEventListener('click', preparePromptNow);
 
       const pickUploadFiles = () => {
         el('file-picker').value = '';
@@ -4294,6 +5469,7 @@
       });
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
+          closeCompressionModal();
           closeLogModal();
           closeRowMenus();
         }
@@ -4303,6 +5479,13 @@
       el('log-modal').addEventListener('click', (event) => {
         if (event.target === el('log-modal')) closeLogModal();
       });
+      el('compression-modal-close').addEventListener('click', closeCompressionModal);
+      el('compression-modal-cancel').addEventListener('click', closeCompressionModal);
+      el('compression-modal-start').addEventListener('click', startCompressionModal);
+      el('compression-modal').addEventListener('click', (event) => {
+        if (event.target === el('compression-modal')) closeCompressionModal();
+      });
+      setupChoiceOptions();
 
       await refresh();
       drawLogs();

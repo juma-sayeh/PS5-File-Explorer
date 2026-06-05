@@ -40,6 +40,10 @@ COMMON_C_SRCS += src/transfer.c
 COMMON_C_SRCS += src/archive_common.c
 COMMON_C_SRCS += src/zip_archive.c
 COMMON_C_SRCS += src/rar_transfer.c
+COMMON_C_SRCS += src/pfs_compress.c
+COMMON_C_SRCS += src/pfs_decompress.c
+COMMON_C_SRCS += src/pfs_block_pipeline.c
+COMMON_C_SRCS += src/miniz_tdef.c
 COMMON_C_SRCS += src/miniz_tinfl.c
 
 FULL_C_SRCS := $(COMMON_C_SRCS)
@@ -101,6 +105,10 @@ ARCHIVE_FAST_C_SRCS := src/transfer.c
 ARCHIVE_FAST_C_SRCS += src/archive_common.c
 ARCHIVE_FAST_C_SRCS += src/zip_archive.c
 ARCHIVE_FAST_C_SRCS += src/rar_transfer.c
+ARCHIVE_FAST_C_SRCS += src/pfs_compress.c
+ARCHIVE_FAST_C_SRCS += src/pfs_decompress.c
+ARCHIVE_FAST_C_SRCS += src/pfs_block_pipeline.c
+ARCHIVE_FAST_C_SRCS += src/miniz_tdef.c
 ARCHIVE_FAST_C_SRCS += src/miniz_tinfl.c
 
 ASSETS := $(wildcard assets/*)

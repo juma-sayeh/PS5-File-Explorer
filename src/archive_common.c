@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -27,6 +28,9 @@ static atomic_int g_archive_backup_counter;
 #define BACKUP_OLD_DIR "old"
 
 static int rar_segment_safe(const char *seg);
+static int archive_app_dir_candidate(const char *path, char *title,
+                                     size_t title_size);
+static int archive_job_cancel_cb(void *opaque);
 
 
 static int
@@ -593,6 +597,87 @@ done:
   return serve_owned(req, 200, b.data, b.len);
 }
 
+
+static void
+archive_remove_empty_backup_parent(const char *app_root) {
+  char parent[1024];
+  char *slash;
+  if(!app_root || !app_root[0]) return;
+  snprintf(parent, sizeof(parent), "%s", app_root);
+  slash = strrchr(parent, '/');
+  if(!slash || slash == parent) return;
+  *slash = 0;
+  (void)rmdir(parent);
+}
+
+
+int
+archive_backup_remove_handler(const http_request_t *req) {
+  char target[1024];
+  char id[256];
+  char all_arg[32];
+  char app_root[1024];
+  char remove_path[1024];
+  char manifest[1024];
+  struct stat st;
+  int remove_all = 0;
+  int removed = 0;
+
+  id[0] = 0;
+  if(!websrv_get_query_arg(req, "path", target, sizeof(target)) ||
+     !path_is_safe(target)) {
+    return serve_error(req, 400, "bad backup remove request");
+  }
+  if(websrv_get_query_arg(req, "all", all_arg, sizeof(all_arg)) &&
+     strcmp(all_arg, "0") != 0) {
+    remove_all = 1;
+  }
+  if(!remove_all &&
+     (!websrv_get_query_arg(req, "id", id, sizeof(id)) ||
+      !archive_token_safe(id))) {
+    return serve_error(req, 400, "bad backup remove request");
+  }
+  if(archive_backup_app_root(target, app_root, sizeof(app_root), NULL, 0) != 0) {
+    return serve_error(req, 400, "bad backup target");
+  }
+
+  if(remove_all) {
+    if(lstat(app_root, &st) != 0) {
+      if(errno != ENOENT) return serve_error(req, 500, strerror(errno));
+    } else {
+      removed = archive_backup_count(target);
+      if(rar_delete_tree(app_root) != 0) {
+        return serve_error(req, 500, strerror(errno));
+      }
+      archive_remove_empty_backup_parent(app_root);
+    }
+  } else {
+    if(snprintf(remove_path, sizeof(remove_path), "%s/%s", app_root, id) >=
+         (int)sizeof(remove_path) ||
+       snprintf(manifest, sizeof(manifest), "%s/%s", remove_path,
+                BACKUP_MANIFEST) >= (int)sizeof(manifest)) {
+      return serve_error(req, 400, "backup path too long");
+    }
+    if(lstat(manifest, &st) != 0 || !S_ISREG(st.st_mode)) {
+      return serve_error(req, 404, "backup not found");
+    }
+    if(rar_delete_tree(remove_path) != 0) {
+      return serve_error(req, 500, strerror(errno));
+    }
+    archive_remove_empty_backup_parent(app_root);
+    removed = 1;
+  }
+
+  json_buf_t b = {0};
+  if(json_append(&b, "{\"ok\":true,\"path\":") != 0 ||
+     json_string(&b, target) != 0 ||
+     json_appendf(&b, ",\"removed\":%d}", removed) != 0) {
+    free(b.data);
+    return -1;
+  }
+  return serve_owned(req, 200, b.data, b.len);
+}
+
 static int
 rar_segment_safe(const char *seg) {
   if(!upload_segment_safe(seg)) return 0;
@@ -628,245 +713,6 @@ rar_rel_depth(const char *rel) {
     }
   }
   return depth;
-}
-
-
-static int
-rar_app_folder_from_segment(const char *seg, char *out, size_t out_size) {
-  if(strlen(seg) != 13) return 0;
-  if(strncasecmp(seg, "PPSA", 4) != 0 || strcasecmp(seg + 9, "-app") != 0) {
-    return 0;
-  }
-  for(int i = 4; i < 9; i++) {
-    if(!isdigit((unsigned char)seg[i]) &&
-       (toupper((unsigned char)seg[i]) < 'A' ||
-        toupper((unsigned char)seg[i]) > 'Z')) {
-      return 0;
-    }
-  }
-  if(out_size < 14) return 0;
-  snprintf(out, out_size, "PPSA%c%c%c%c%c-app",
-           toupper((unsigned char)seg[4]), toupper((unsigned char)seg[5]),
-           toupper((unsigned char)seg[6]), toupper((unsigned char)seg[7]),
-           toupper((unsigned char)seg[8]));
-  return 1;
-}
-
-
-static int
-rar_rel_after_prefix_is_eboot(const char *rel, const char *prefix) {
-  size_t n = strlen(prefix);
-  if(strncmp(rel, prefix, n) != 0) return 0;
-  if(rel[n] == '/') n++;
-  else if(rel[n] != 0) return 0;
-  return !strcasecmp(rel + n, "eboot.bin");
-}
-
-
-static int
-rar_layout_better(const rar_layout_choice_t *l, const char *prefix,
-                  int depth, int has_eboot) {
-  if(!l->app_prefix[0]) return 1;
-  if(has_eboot != l->app_has_eboot) return has_eboot;
-  if(depth != l->app_depth) return depth < l->app_depth;
-  return strcmp(prefix, l->app_prefix) < 0;
-}
-
-
-static void
-rar_consider_file_layout(rar_layout_choice_t *layout, const char *rel) {
-  char tmp[ZIP_NAME_MAX];
-  char prefix[ZIP_NAME_MAX] = {0};
-  size_t prefix_len = 0;
-  char *seg;
-
-  snprintf(tmp, sizeof(tmp), "%s", rel);
-  seg = tmp;
-  while(seg && *seg) {
-    char *slash = strchr(seg, '/');
-    if(slash) *slash = 0;
-    if(*seg) {
-      char app_folder[256];
-      size_t seg_len = strlen(seg);
-      if(prefix_len + (prefix_len ? 1 : 0) + seg_len + 1 < sizeof(prefix)) {
-        if(prefix_len) prefix[prefix_len++] = '/';
-        memcpy(prefix + prefix_len, seg, seg_len + 1);
-        prefix_len += seg_len;
-      }
-      if(rar_app_folder_from_segment(seg, app_folder, sizeof(app_folder))) {
-        int has_eboot = rar_rel_after_prefix_is_eboot(rel, prefix);
-        int depth = rar_rel_depth(prefix);
-        if(rar_layout_better(layout, prefix, depth, has_eboot) ||
-           !strcmp(layout->app_prefix, prefix)) {
-          snprintf(layout->app_prefix, sizeof(layout->app_prefix), "%s", prefix);
-          snprintf(layout->dest_folder, sizeof(layout->dest_folder), "%s",
-                   app_folder);
-          if(has_eboot) layout->app_has_eboot = 1;
-          layout->app_depth = depth;
-        }
-      }
-    }
-    if(!slash) break;
-    seg = slash + 1;
-  }
-
-  const char *base = strrchr(rel, '/');
-  base = base ? base + 1 : rel;
-  if(!strcasecmp(base, "eboot.bin")) {
-    char parent[ZIP_NAME_MAX] = {0};
-    int depth;
-    size_t parent_len = (size_t)(base - rel);
-    if(parent_len > 0 && rel[parent_len - 1] == '/') parent_len--;
-    if(parent_len >= sizeof(parent)) return;
-    memcpy(parent, rel, parent_len);
-    parent[parent_len] = 0;
-    depth = rar_rel_depth(parent);
-    if(!layout->eboot_parent[0] ||
-       depth < layout->eboot_depth ||
-       (depth == layout->eboot_depth &&
-        strcmp(parent, layout->eboot_parent) < 0)) {
-      snprintf(layout->eboot_parent, sizeof(layout->eboot_parent), "%s",
-               parent);
-      layout->eboot_depth = depth;
-    }
-  }
-}
-
-
-static int
-rar_scan_stage(const char *root, const char *rel, rar_layout_choice_t *layout,
-               char *err, size_t err_size) {
-  char path[1024];
-  DIR *d;
-  struct dirent *ent;
-
-  if(rel && rel[0]) {
-    if(strlen(root) + strlen(rel) + 2 >= sizeof(path)) {
-      snprintf(err, err_size, "rar path too long");
-      return -1;
-    }
-    join_path(path, sizeof(path), root, rel);
-  } else {
-    snprintf(path, sizeof(path), "%s", root);
-  }
-
-  d = opendir(path);
-  if(!d) {
-    snprintf(err, err_size, "scan rar output: %s", strerror(errno));
-    return -1;
-  }
-
-  while((ent = readdir(d))) {
-    char child_rel[ZIP_NAME_MAX];
-    char child_path[1024];
-    struct stat st;
-
-    if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
-    if(!rar_segment_safe(ent->d_name) ||
-       rar_join_rel(child_rel, sizeof(child_rel), rel ? rel : "",
-                    ent->d_name) != 0) {
-      snprintf(err, err_size, "rar contains an unsafe path");
-      closedir(d);
-      return -1;
-    }
-    if(strlen(root) + strlen(child_rel) + 2 >= sizeof(child_path)) {
-      snprintf(err, err_size, "rar path too long");
-      closedir(d);
-      return -1;
-    }
-    join_path(child_path, sizeof(child_path), root, child_rel);
-    if(lstat(child_path, &st) != 0) {
-      snprintf(err, err_size, "stat rar output: %s", strerror(errno));
-      closedir(d);
-      return -1;
-    }
-    if(S_ISLNK(st.st_mode)) {
-      snprintf(err, err_size, "rar links are not supported");
-      closedir(d);
-      return -1;
-    }
-    if(S_ISDIR(st.st_mode)) {
-      if(rar_scan_stage(root, child_rel, layout, err, err_size) != 0) {
-        closedir(d);
-        return -1;
-      }
-    } else if(S_ISREG(st.st_mode)) {
-      layout->files++;
-      rar_consider_file_layout(layout, child_rel);
-    }
-  }
-
-  closedir(d);
-  return 0;
-}
-
-
-static int
-rar_title_from_name(const char *name, char *out, size_t out_size) {
-  for(const char *p = name ? name : ""; *p; p++) {
-    if(strlen(p) < 9) break;
-    if(strncasecmp(p, "PPSA", 4) != 0) continue;
-    int ok = 1;
-    for(int i = 4; i < 9; i++) {
-      if(!isalnum((unsigned char)p[i])) {
-        ok = 0;
-        break;
-      }
-    }
-    if(ok) {
-      if(out_size < 10) return 0;
-      snprintf(out, out_size, "PPSA%c%c%c%c%c",
-               toupper((unsigned char)p[4]), toupper((unsigned char)p[5]),
-               toupper((unsigned char)p[6]), toupper((unsigned char)p[7]),
-               toupper((unsigned char)p[8]));
-      return 1;
-    }
-  }
-  return 0;
-}
-
-
-int
-rar_choose_layout(const char *stage, const char *archive_name,
-                  rar_layout_choice_t *layout, char *err, size_t err_size) {
-  char title[16];
-  memset(layout, 0, sizeof(*layout));
-  layout->app_depth = INT_MAX;
-  layout->eboot_depth = INT_MAX;
-
-  if(rar_scan_stage(stage, "", layout, err, err_size) != 0) return -1;
-  if(layout->files <= 0) {
-    snprintf(err, err_size, "rar contained no files");
-    return -1;
-  }
-  if(layout->app_prefix[0] && layout->app_has_eboot) return 0;
-
-  if(layout->dest_folder[0]) {
-    size_t n = strlen(layout->dest_folder);
-    if(n > 4 && n - 4 < sizeof(title) &&
-       !strcasecmp(layout->dest_folder + n - 4, "-app")) {
-      memcpy(title, layout->dest_folder, n - 4);
-      title[n - 4] = 0;
-    } else {
-      title[0] = 0;
-    }
-  } else if(!rar_title_from_name(archive_name, title, sizeof(title))) {
-    title[0] = 0;
-  }
-
-  if(!title[0] && !rar_title_from_name(archive_name, title, sizeof(title))) {
-    snprintf(err, err_size, "No PPSA title ID found in rar name or app folder");
-    return -1;
-  }
-  if(!layout->eboot_parent[0] && layout->eboot_depth != 0) {
-    snprintf(err, err_size, "No eboot.bin found to place inside %s-app",
-             title);
-    return -1;
-  }
-  snprintf(layout->dest_folder, sizeof(layout->dest_folder), "%s-app", title);
-  snprintf(layout->app_prefix, sizeof(layout->app_prefix), "%s",
-           layout->eboot_parent);
-  return 0;
 }
 
 
@@ -1112,44 +958,85 @@ archive_job_cancel_cb(void *opaque) {
   return job_cancelled();
 }
 
+static int
+archive_archive_folder_name(const char *archive_name, char *out,
+                            size_t out_size) {
+  const char *base = path_basename(archive_name ? archive_name : "");
+  size_t n = strlen(base);
+  if(n > 12 && !strncasecmp(base + n - 12, ".part001.rar", 12)) {
+    n -= 12;
+  } else if(n > 4 &&
+            (!strcasecmp(base + n - 4, ".zip") ||
+             !strcasecmp(base + n - 4, ".rar"))) {
+    n -= 4;
+  }
+  if(n == 0 || n >= out_size) {
+    errno = n == 0 ? EINVAL : ENAMETOOLONG;
+    return -1;
+  }
+  size_t pos = 0;
+  for(size_t i = 0; i < n && pos + 1 < out_size; i++) {
+    unsigned char ch = (unsigned char)base[i];
+    if(isalnum(ch) || ch == '-' || ch == '_' || ch == '.') {
+      out[pos++] = (char)ch;
+    } else {
+      out[pos++] = '_';
+    }
+  }
+  while(pos > 0 && out[pos - 1] == '.') pos--;
+  if(pos == 0) {
+    snprintf(out, out_size, "archive");
+  } else {
+    out[pos] = 0;
+  }
+  if(!upload_segment_safe(out)) {
+    errno = EINVAL;
+    return -1;
+  }
+  return 0;
+}
+
 
 int
 archive_place_stage(const char *stage, const char *archive_name,
                     const char *dest, char *final_base,
                     size_t final_base_size, long *files,
                     char *err, size_t err_size) {
-  rar_layout_choice_t layout;
-  char src_root[1024];
+  char dest_folder[256];
   archive_backup_ctx_t backup;
   int backup_started = 0;
   int rc = -1;
   struct stat dst_st;
+  struct stat stage_st;
+  du_state_t du = {0};
   memset(&backup, 0, sizeof(backup));
 
   job_set_current("Placing extracted files");
-  if(rar_choose_layout(stage, archive_name, &layout, err, err_size) != 0) {
+  if(archive_archive_folder_name(archive_name, dest_folder,
+                                 sizeof(dest_folder)) != 0) {
+    snprintf(err, err_size, "archive folder name: %s", strerror(errno));
     goto done;
   }
 
+  if(lstat(stage, &stage_st) != 0 || !S_ISDIR(stage_st.st_mode)) {
+    snprintf(err, err_size, "archive stage: %s", strerror(errno));
+    goto done;
+  }
+  du.root_dev = stage_st.st_dev;
+  du_walk(stage, &du);
+  if(du.files <= 0) {
+    snprintf(err, err_size, "archive contained no files");
+    goto done;
+  }
   atomic_store(&g_job.done_files, 0);
   atomic_store(&g_job.total_files,
-               layout.files > INT_MAX ? INT_MAX : (int)layout.files);
+               du.files > (uint64_t)INT_MAX ? INT_MAX : (int)du.files);
 
-  if(layout.app_prefix[0]) {
-    if(strlen(stage) + strlen(layout.app_prefix) + 2 >= sizeof(src_root)) {
-      snprintf(err, err_size, "archive path too long");
-      return -1;
-    }
-    join_path(src_root, sizeof(src_root), stage, layout.app_prefix);
-  } else {
-    snprintf(src_root, sizeof(src_root), "%s", stage);
-  }
-
-  if(strlen(dest) + strlen(layout.dest_folder) + 2 >= final_base_size) {
+  if(strlen(dest) + strlen(dest_folder) + 2 >= final_base_size) {
     snprintf(err, err_size, "archive destination path too long");
     return -1;
   }
-  join_path(final_base, final_base_size, dest, layout.dest_folder);
+  join_path(final_base, final_base_size, dest, dest_folder);
   job_set_target(final_base);
 
   if(lstat(final_base, &dst_st) == 0) {
@@ -1167,7 +1054,7 @@ archive_place_stage(const char *stage, const char *archive_name,
     goto done;
   }
 
-  if(archive_merge_move_tree(src_root, final_base, "", &backup,
+  if(archive_merge_move_tree(stage, final_base, "", &backup,
                              err, err_size) != 0) {
     if(!err[0]) {
       snprintf(err, err_size, "place archive output: %s",
@@ -1176,16 +1063,11 @@ archive_place_stage(const char *stage, const char *archive_name,
     goto done;
   }
 
-  if(files) *files = layout.files;
+  if(files) *files = (long)(du.files > (uint64_t)LONG_MAX
+                            ? LONG_MAX : du.files);
   if(backup_started) {
     archive_backup_close(&backup, 1);
     backup_started = 0;
-  }
-
-  job_set_current("Setting permissions");
-  if(archive_chmod_777_recursive(final_base, archive_job_cancel_cb, NULL,
-                                 NULL, NULL, NULL, err, err_size) != 0) {
-    goto done;
   }
   rc = 0;
 
@@ -1196,6 +1078,829 @@ done:
              job_cancelled() ? "cancelled" : strerror(errno));
   }
   return rc;
+}
+
+static int
+archive_title_id_safe(const char *title) {
+  if(!title || !*title || strlen(title) >= 64) return 0;
+  for(const unsigned char *p = (const unsigned char *)title; *p; p++) {
+    if(!isalnum(*p) && *p != '_' && *p != '-') return 0;
+  }
+  return 1;
+}
+
+
+static int
+archive_read_file_limited(const char *path, char **out, size_t max_size) {
+  FILE *f = fopen(path, "rb");
+  if(!f) return -1;
+  if(fseek(f, 0, SEEK_END) != 0) {
+    fclose(f);
+    return -1;
+  }
+  long end = ftell(f);
+  if(end < 0 || (size_t)end > max_size) {
+    fclose(f);
+    errno = EFBIG;
+    return -1;
+  }
+  if(fseek(f, 0, SEEK_SET) != 0) {
+    fclose(f);
+    return -1;
+  }
+  char *buf = malloc((size_t)end + 1);
+  if(!buf) {
+    fclose(f);
+    errno = ENOMEM;
+    return -1;
+  }
+  size_t n = fread(buf, 1, (size_t)end, f);
+  int ferr = ferror(f);
+  fclose(f);
+  if(ferr) {
+    free(buf);
+    errno = EIO;
+    return -1;
+  }
+  buf[n] = 0;
+  *out = buf;
+  return 0;
+}
+
+
+static int
+archive_json_find_string(const char *json, const char *key,
+                         char *out, size_t out_size) {
+  char needle[80];
+  snprintf(needle, sizeof(needle), "\"%s\"", key);
+  const char *p = strstr(json, needle);
+  if(!p) return 0;
+  p += strlen(needle);
+  while(*p && isspace((unsigned char)*p)) p++;
+  if(*p != ':') return 0;
+  p++;
+  while(*p && isspace((unsigned char)*p)) p++;
+  if(*p != '"') return 0;
+  p++;
+  size_t pos = 0;
+  while(*p && *p != '"' && pos + 1 < out_size) {
+    if(*p == '\\') return 0;
+    out[pos++] = *p++;
+  }
+  if(*p != '"' || pos == 0) return 0;
+  out[pos] = 0;
+  return 1;
+}
+
+
+static int
+archive_app_read_title_id(const char *app_path, char *title, size_t title_size) {
+  char sce_sys[1024];
+  char param[1024];
+  char *json = NULL;
+  int ok;
+  if(strlen(app_path) + strlen("sce_sys/param.json") + 3 >= sizeof(param)) {
+    errno = ENAMETOOLONG;
+    return -1;
+  }
+  join_path(sce_sys, sizeof(sce_sys), app_path, "sce_sys");
+  join_path(param, sizeof(param), sce_sys, "param.json");
+  if(archive_read_file_limited(param, &json, 128 * 1024) != 0) return -1;
+  ok = archive_json_find_string(json, "titleId", title, title_size) ||
+       archive_json_find_string(json, "title_id", title, title_size);
+  free(json);
+  if(!ok || !archive_title_id_safe(title)) {
+    errno = EINVAL;
+    return -1;
+  }
+  return 0;
+}
+
+
+static int
+archive_app_has_boot_file(const char *app_path) {
+  char path[1024];
+  struct stat st;
+  if(strlen(app_path) + strlen("eboot.bin") + 2 < sizeof(path)) {
+    join_path(path, sizeof(path), app_path, "eboot.bin");
+    if(stat(path, &st) == 0 && S_ISREG(st.st_mode)) return 1;
+  }
+  if(strlen(app_path) + strlen("iboot.bin") + 2 < sizeof(path)) {
+    join_path(path, sizeof(path), app_path, "iboot.bin");
+    if(stat(path, &st) == 0 && S_ISREG(st.st_mode)) return 1;
+  }
+  return 0;
+}
+
+
+static int
+archive_title_from_text(const char *text, char *out, size_t out_size) {
+  if(!text || out_size < 10) return 0;
+  for(const char *p = text; *p; p++) {
+    if(strlen(p) < 9) break;
+    if(toupper((unsigned char)p[0]) != 'P' ||
+       toupper((unsigned char)p[1]) != 'P' ||
+       toupper((unsigned char)p[2]) != 'S' ||
+       toupper((unsigned char)p[3]) != 'A') {
+      continue;
+    }
+    int ok = 1;
+    for(int i = 4; i < 9; i++) {
+      if(!isalnum((unsigned char)p[i])) {
+        ok = 0;
+        break;
+      }
+    }
+    if(!ok) continue;
+    if((p > text && isalnum((unsigned char)p[-1])) ||
+       isalnum((unsigned char)p[9])) {
+      continue;
+    }
+    for(int i = 0; i < 9; i++) {
+      out[i] = (char)toupper((unsigned char)p[i]);
+    }
+    out[9] = 0;
+    return archive_title_id_safe(out);
+  }
+  return 0;
+}
+
+
+static int
+archive_path_same_or_child(const char *root, const char *path) {
+  size_t n;
+  if(!root || !path) return 0;
+  n = strlen(root);
+  while(n > 1 && root[n - 1] == '/') n--;
+  return strncmp(root, path, n) == 0 && (path[n] == 0 || path[n] == '/');
+}
+
+
+static int
+archive_path_depth(const char *path) {
+  int depth = 0;
+  int in_seg = 0;
+  for(const char *p = path; p && *p; p++) {
+    if(*p == '/') {
+      in_seg = 0;
+    } else if(!in_seg) {
+      depth++;
+      in_seg = 1;
+    }
+  }
+  return depth;
+}
+
+
+static int
+archive_title_app_path(const char *root, const char *title,
+                       char *out, size_t out_size) {
+  char expected[128];
+  int n;
+  if(snprintf(expected, sizeof(expected), "%s-app", title) >=
+     (int)sizeof(expected)) {
+    errno = ENAMETOOLONG;
+    return -1;
+  }
+  n = snprintf(out, out_size, "%s%s%s",
+               root, root[1] ? "/" : "", expected);
+  if(n < 0 || (size_t)n >= out_size) {
+    errno = ENAMETOOLONG;
+    return -1;
+  }
+  return 0;
+}
+
+
+static int
+archive_app_dir_candidate(const char *path, char *title, size_t title_size) {
+  struct stat st;
+  if(lstat(path, &st) != 0 || !S_ISDIR(st.st_mode)) return 0;
+  if(!archive_app_has_boot_file(path)) return 0;
+  return archive_app_read_title_id(path, title, title_size) == 0;
+}
+
+
+static int
+archive_find_context_app_target(const char *scan_path, char *target,
+                                size_t target_size, char *title,
+                                size_t title_size) {
+  char cursor[1024];
+  char parent[1024];
+  char base[256];
+  char found_title[64];
+
+  if(!scan_path || !*scan_path || !target || target_size == 0 ||
+     !title || title_size == 0) {
+    return 0;
+  }
+  snprintf(cursor, sizeof(cursor), "%s", scan_path);
+  for(;;) {
+    if(archive_app_dir_candidate(cursor, found_title, sizeof(found_title))) {
+      snprintf(target, target_size, "%s", cursor);
+      snprintf(title, title_size, "%s", found_title);
+      return 1;
+    }
+    if(!strcmp(cursor, "/")) break;
+    if(archive_parent_path(cursor, parent, sizeof(parent),
+                           base, sizeof(base)) != 0) {
+      break;
+    }
+    if(!strcmp(parent, cursor)) break;
+    snprintf(cursor, sizeof(cursor), "%s", parent);
+  }
+  return 0;
+}
+
+
+static int
+archive_homebrew_app_target_exists(const char *title) {
+  char target[1024];
+  struct stat st;
+  if(!title || !*title) return 0;
+  if(archive_title_app_path("/data/homebrew", title, target,
+                            sizeof(target)) != 0) {
+    return 0;
+  }
+  return lstat(target, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+
+static int
+archive_app_patch_dir_candidate(const char *scan_path, const char *path,
+                                char *title, size_t title_size) {
+  struct stat st;
+  char tmp[64];
+  char context_target[1024];
+  char context_title[64];
+  if(lstat(path, &st) != 0 || !S_ISDIR(st.st_mode)) return 0;
+  if(!archive_app_has_boot_file(path)) return 0;
+  if(archive_app_read_title_id(path, tmp, sizeof(tmp)) == 0) return 0;
+  if(archive_find_context_app_target(scan_path, context_target,
+                                     sizeof(context_target), context_title,
+                                     sizeof(context_title)) &&
+     strcmp(path, context_target) != 0 &&
+     archive_path_same_or_child(context_target, path)) {
+    snprintf(title, title_size, "%s", context_title);
+    return 1;
+  }
+  if(!archive_title_from_text(path, title, title_size) &&
+     !archive_title_from_text(scan_path, title, title_size)) {
+    return 0;
+  }
+  return archive_homebrew_app_target_exists(title);
+}
+
+
+static int
+archive_app_named_path(const char *path, const char *title) {
+  char parent[1024];
+  char base[256];
+  char expected[128];
+  if(!title || !*title) return 0;
+  if(archive_parent_path(path, parent, sizeof(parent), base, sizeof(base)) != 0) {
+    return 0;
+  }
+  if(snprintf(expected, sizeof(expected), "%s-app", title) >=
+     (int)sizeof(expected)) {
+    return 0;
+  }
+  return !strcasecmp(base, expected);
+}
+
+
+static int
+archive_app_candidate_better(const char *scan_path, const char *current,
+                             const char *current_title, int current_patch,
+                             const char *next, const char *next_title,
+                             int next_patch) {
+  if(!current[0]) return 1;
+  if(next_patch != current_patch) return !next_patch;
+  int next_is_root = strcmp(scan_path, next) == 0;
+  int current_is_root = strcmp(scan_path, current) == 0;
+  if(next_is_root != current_is_root) return next_is_root;
+
+  int next_named = archive_app_named_path(next, next_title);
+  int current_named = archive_app_named_path(current, current_title);
+  if(next_named != current_named) return next_named;
+
+  int next_depth = rar_rel_depth(next + strlen(scan_path));
+  int current_depth = rar_rel_depth(current + strlen(scan_path));
+  if(next_depth != current_depth) return next_depth < current_depth;
+  return strcmp(next, current) < 0;
+}
+
+
+static int
+archive_app_find_candidate(const char *scan_path, const char *path,
+                           archive_app_prepare_info_t *info,
+                           char *err, size_t err_size) {
+  char title[64];
+  int patch_mode = 0;
+  if(archive_app_dir_candidate(path, title, sizeof(title))) {
+    patch_mode = 0;
+  } else if(archive_app_patch_dir_candidate(scan_path, path,
+                                            title, sizeof(title))) {
+    patch_mode = 1;
+  } else {
+    title[0] = 0;
+  }
+  if(title[0]) {
+    if(archive_app_candidate_better(scan_path, info->app_path,
+                                    info->title_id, info->patch_mode,
+                                    path, title, patch_mode)) {
+      info->found = 1;
+      info->patch_mode = patch_mode;
+      snprintf(info->title_id, sizeof(info->title_id), "%s", title);
+      snprintf(info->app_path, sizeof(info->app_path), "%s", path);
+    }
+  }
+
+  DIR *d = opendir(path);
+  if(!d) return 0;
+  struct dirent *ent;
+  while((ent = readdir(d))) {
+    char child[1024];
+    struct stat st;
+    if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+    if(!rar_segment_safe(ent->d_name)) {
+      snprintf(err, err_size, "app scan found unsafe path");
+      closedir(d);
+      return -1;
+    }
+    if(strlen(path) + strlen(ent->d_name) + 2 >= sizeof(child)) {
+      snprintf(err, err_size, "app scan path too long");
+      closedir(d);
+      return -1;
+    }
+    join_path(child, sizeof(child), path, ent->d_name);
+    if(lstat(child, &st) != 0) {
+      snprintf(err, err_size, "app scan stat: %s", strerror(errno));
+      closedir(d);
+      return -1;
+    }
+    if(S_ISLNK(st.st_mode)) continue;
+    if(S_ISDIR(st.st_mode) &&
+       archive_app_find_candidate(scan_path, child, info,
+                                  err, err_size) != 0) {
+      closedir(d);
+      return -1;
+    }
+  }
+  closedir(d);
+  return 0;
+}
+
+
+static int
+archive_tree_permissions_777(const char *path, int *ok,
+                             char *err, size_t err_size) {
+  struct stat st;
+  if(lstat(path, &st) != 0) {
+    snprintf(err, err_size, "stat permissions: %s", strerror(errno));
+    return -1;
+  }
+  if(S_ISLNK(st.st_mode)) return 0;
+  if((st.st_mode & 0777) != 0777) {
+    *ok = 0;
+    return 0;
+  }
+  if(!S_ISDIR(st.st_mode)) return 0;
+
+  DIR *d = opendir(path);
+  if(!d) {
+    snprintf(err, err_size, "open permissions: %s", strerror(errno));
+    return -1;
+  }
+  struct dirent *ent;
+  int rc = 0;
+  while(*ok && (ent = readdir(d))) {
+    char child[1024];
+    if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+    if(strlen(path) + strlen(ent->d_name) + 2 >= sizeof(child)) {
+      snprintf(err, err_size, "permissions path too long");
+      rc = -1;
+      break;
+    }
+    join_path(child, sizeof(child), path, ent->d_name);
+    if(archive_tree_permissions_777(child, ok, err, err_size) != 0) {
+      rc = -1;
+      break;
+    }
+  }
+  closedir(d);
+  return rc;
+}
+
+
+static int
+archive_app_resolve_prepared_path(const char *scan_path, const char *app_path,
+                                  const char *title, int patch_mode,
+                                  char *out, size_t out_size,
+                                  int *target_exists) {
+  char parent[1024], base[256], target[1024];
+  char context_title[64];
+  struct stat st;
+
+  if(target_exists) *target_exists = 0;
+
+  if(patch_mode &&
+     archive_find_context_app_target(scan_path, target, sizeof(target),
+                                     context_title, sizeof(context_title)) &&
+     strcmp(app_path, target) != 0 &&
+     archive_path_same_or_child(target, app_path)) {
+    snprintf(out, out_size, "%s", target);
+    if(target_exists) *target_exists = 1;
+    return 0;
+  }
+
+  if(archive_title_app_path("/data/homebrew", title, target, sizeof(target)) == 0 &&
+     strcmp(app_path, target) == 0) {
+    snprintf(out, out_size, "%s", target);
+    if(target_exists) *target_exists = 1;
+    return 0;
+  }
+
+  if(archive_title_app_path("/data/homebrew", title, target, sizeof(target)) == 0 &&
+     lstat(target, &st) == 0 && S_ISDIR(st.st_mode)) {
+    snprintf(out, out_size, "%s", target);
+    if(target_exists) *target_exists = 1;
+    return 0;
+  }
+
+  if(archive_parent_path(scan_path, parent, sizeof(parent),
+                         base, sizeof(base)) == 0 &&
+     archive_title_app_path(parent, title, target, sizeof(target)) == 0 &&
+     lstat(target, &st) == 0 && S_ISDIR(st.st_mode)) {
+    snprintf(out, out_size, "%s", target);
+    if(target_exists) *target_exists = 1;
+    return 0;
+  }
+
+  if(lstat("/data/homebrew", &st) == 0 && S_ISDIR(st.st_mode)) {
+    if(archive_title_app_path("/data/homebrew", title, out, out_size) != 0) {
+      return -1;
+    }
+  } else if(!patch_mode && archive_app_named_path(app_path, title)) {
+    snprintf(out, out_size, "%s", app_path);
+    if(target_exists) *target_exists = 1;
+    return 0;
+  } else if(archive_parent_path(scan_path, parent, sizeof(parent),
+                                base, sizeof(base)) == 0) {
+    if(archive_title_app_path(parent, title, out, out_size) != 0) return -1;
+  } else {
+    errno = EINVAL;
+    return -1;
+  }
+
+  if(target_exists && lstat(out, &st) == 0) *target_exists = 1;
+  return 0;
+}
+
+
+static int
+archive_prepare_delete_scan_safe(const archive_app_prepare_info_t *info) {
+  if(!info || !info->scan_path[0] || !info->app_path[0] ||
+     !info->prepared_path[0]) {
+    return 0;
+  }
+  if(strcmp(info->scan_path, info->app_path) == 0 ||
+     strcmp(info->scan_path, info->prepared_path) == 0) {
+    return 0;
+  }
+  if(!archive_path_same_or_child(info->scan_path, info->app_path)) return 0;
+  if(archive_path_same_or_child(info->scan_path, info->prepared_path)) return 0;
+  return archive_path_depth(info->scan_path) >= 3;
+}
+
+
+static void
+archive_prepare_set_delete_sample(archive_app_prepare_info_t *info,
+                                  const char *path, int is_dir,
+                                  int *sample_is_dir) {
+  char rel[512];
+  if(archive_rel_from_path(info->scan_path, path, rel, sizeof(rel)) != 0) {
+    return;
+  }
+  if(!info->delete_extra_sample[0] ||
+     (!is_dir && sample_is_dir && *sample_is_dir)) {
+    snprintf(info->delete_extra_sample,
+             sizeof(info->delete_extra_sample), "%s", rel);
+    if(sample_is_dir) *sample_is_dir = is_dir;
+  }
+}
+
+
+static int
+archive_prepare_count_extras_walk(archive_app_prepare_info_t *info,
+                                  const char *path, int *sample_is_dir,
+                                  char *err, size_t err_size) {
+  DIR *d = opendir(path);
+  if(!d) {
+    snprintf(err, err_size, "scan cleanup files: %s", strerror(errno));
+    return -1;
+  }
+
+  struct dirent *ent;
+  int rc = 0;
+  while((ent = readdir(d))) {
+    char child[1024];
+    struct stat st;
+    if(!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+    if(strlen(path) + strlen(ent->d_name) + 2 >= sizeof(child)) {
+      snprintf(err, err_size, "cleanup path too long");
+      rc = -1;
+      break;
+    }
+    join_path(child, sizeof(child), path, ent->d_name);
+    if(lstat(child, &st) != 0) {
+      snprintf(err, err_size, "scan cleanup file: %s", strerror(errno));
+      rc = -1;
+      break;
+    }
+
+    if(archive_path_same_or_child(info->app_path, child)) {
+      continue;
+    }
+    if(S_ISDIR(st.st_mode) &&
+       archive_path_same_or_child(child, info->app_path)) {
+      if(archive_prepare_count_extras_walk(info, child, sample_is_dir,
+                                           err, err_size) != 0) {
+        rc = -1;
+        break;
+      }
+      continue;
+    }
+
+    if(S_ISDIR(st.st_mode)) {
+      info->delete_extra_dirs++;
+      archive_prepare_set_delete_sample(info, child, 1, sample_is_dir);
+      if(archive_prepare_count_extras_walk(info, child, sample_is_dir,
+                                           err, err_size) != 0) {
+        rc = -1;
+        break;
+      }
+    } else {
+      info->delete_extra_files++;
+      archive_prepare_set_delete_sample(info, child, 0, sample_is_dir);
+    }
+  }
+  closedir(d);
+  return rc;
+}
+
+
+static int
+archive_prepare_count_extras(archive_app_prepare_info_t *info,
+                             char *err, size_t err_size) {
+  int sample_is_dir = 0;
+  if(!archive_prepare_delete_scan_safe(info)) return 0;
+  return archive_prepare_count_extras_walk(info, info->scan_path,
+                                           &sample_is_dir, err, err_size);
+}
+
+
+int
+archive_app_prepare_probe(const char *path, archive_app_prepare_info_t *info,
+                          char *err, size_t err_size) {
+  char scan[1024];
+  struct stat st;
+  archive_app_prepare_info_t local;
+  if(!info) info = &local;
+  memset(info, 0, sizeof(*info));
+
+  if(!path || !path_is_safe(path)) {
+    snprintf(err, err_size, "bad path");
+    errno = EINVAL;
+    return -1;
+  }
+  snprintf(scan, sizeof(scan), "%s", path);
+  size_t n = strlen(scan);
+  while(n > 1 && scan[n - 1] == '/') scan[--n] = 0;
+  if(lstat(scan, &st) != 0 || !S_ISDIR(st.st_mode)) {
+    snprintf(err, err_size, "prepare target is not a folder");
+    return -1;
+  }
+  snprintf(info->scan_path, sizeof(info->scan_path), "%s", scan);
+  if(archive_app_find_candidate(scan, scan, info, err, err_size) != 0) {
+    return -1;
+  }
+  if(!info->found) {
+    snprintf(info->reason, sizeof(info->reason), "no PS5 app found");
+    return 0;
+  }
+
+  if(archive_app_resolve_prepared_path(scan, info->app_path, info->title_id,
+                                       info->patch_mode,
+                                       info->prepared_path,
+                                       sizeof(info->prepared_path),
+                                       &info->target_exists) != 0) {
+    snprintf(err, err_size, "prepared path too long");
+    return -1;
+  }
+  info->path_ok = strcmp(info->app_path, info->prepared_path) == 0;
+  info->merge_required = info->target_exists && !info->path_ok;
+  info->permissions_ok = 1;
+  if(!info->patch_mode) {
+    const char *perm_path = info->target_exists ? info->prepared_path
+                           : info->app_path;
+    if(archive_tree_permissions_777(perm_path, &info->permissions_ok,
+                                    err, err_size) != 0) {
+      return -1;
+    }
+  }
+  if(archive_prepare_count_extras(info, err, err_size) != 0) {
+    return -1;
+  }
+  info->prepared = !info->patch_mode && !info->merge_required &&
+                   info->path_ok && info->permissions_ok &&
+                   info->delete_extra_files == 0 &&
+                   info->delete_extra_dirs == 0;
+  if(info->prepared) {
+    snprintf(info->reason, sizeof(info->reason), "already prepared");
+  } else if(info->patch_mode && info->target_exists) {
+    snprintf(info->reason, sizeof(info->reason),
+             "patch will overwrite matching files");
+  } else if(info->patch_mode && info->merge_required &&
+            (info->delete_extra_files || info->delete_extra_dirs)) {
+    snprintf(info->reason, sizeof(info->reason),
+             "patch will overwrite matching files and remove extra extracted files");
+  } else if(info->patch_mode && info->merge_required) {
+    snprintf(info->reason, sizeof(info->reason),
+             "patch will overwrite matching files");
+  } else if(info->patch_mode) {
+    snprintf(info->reason, sizeof(info->reason),
+             "needs app folder placement");
+  } else if(info->merge_required &&
+            (info->delete_extra_files || info->delete_extra_dirs)) {
+    snprintf(info->reason, sizeof(info->reason),
+             "needs merge into existing app and cleanup");
+  } else if(info->merge_required) {
+    snprintf(info->reason, sizeof(info->reason),
+             "needs merge into existing app");
+  } else if(!info->path_ok && !info->permissions_ok) {
+    snprintf(info->reason, sizeof(info->reason),
+             "needs app folder placement and permissions");
+  } else if(!info->path_ok) {
+    snprintf(info->reason, sizeof(info->reason),
+             "needs app folder placement");
+  } else {
+    snprintf(info->reason, sizeof(info->reason), "needs permissions");
+  }
+  return 0;
+}
+
+
+int
+archive_app_prepare_apply(const char *path, archive_app_prepare_info_t *info,
+                          char *err, size_t err_size) {
+  archive_app_prepare_info_t local;
+  struct stat st;
+  archive_backup_ctx_t backup;
+  int backup_started = 0;
+  int cleanup_extras = 0;
+  if(!info) info = &local;
+  memset(&backup, 0, sizeof(backup));
+  if(archive_app_prepare_probe(path, info, err, err_size) != 0) return -1;
+  if(!info->found) {
+    snprintf(err, err_size, "no PS5 app found");
+    errno = ENOENT;
+    return -1;
+  }
+
+  job_set_target(info->prepared_path);
+  cleanup_extras = archive_prepare_delete_scan_safe(info) &&
+                   (info->patch_mode ||
+                    info->delete_extra_files || info->delete_extra_dirs);
+  if(info->patch_mode) {
+    if(info->path_ok) {
+      snprintf(err, err_size, "patch source is already the app target");
+      errno = EINVAL;
+      return -1;
+    }
+    if(lstat(info->prepared_path, &st) != 0) {
+      snprintf(err, err_size, "patch target app does not exist");
+      errno = ENOENT;
+      return -1;
+    }
+    if(!S_ISDIR(st.st_mode)) {
+      snprintf(err, err_size, "patch target is not a folder");
+      errno = ENOTDIR;
+      return -1;
+    }
+    if(archive_path_same_or_child(info->app_path, info->prepared_path)) {
+      snprintf(err, err_size, "patch source and target overlap");
+      errno = EINVAL;
+      return -1;
+    }
+
+    job_set_current("Setting patch permissions");
+    if(archive_chmod_777_recursive(info->app_path, archive_job_cancel_cb,
+                                   NULL, NULL, NULL, NULL, err,
+                                   err_size) != 0) {
+      return -1;
+    }
+
+    job_set_current("Applying patch");
+    if(archive_backup_begin(&backup, info->prepared_path,
+                            path_basename(info->scan_path),
+                            err, err_size) != 0) {
+      return -1;
+    }
+    backup_started = 1;
+    if(archive_merge_move_tree(info->app_path, info->prepared_path, "",
+                               &backup, err, err_size) != 0) {
+      if(!err[0]) {
+        snprintf(err, err_size, "apply patch: %s",
+                 job_cancelled() ? "cancelled" : strerror(errno));
+      }
+      archive_backup_close(&backup, 0);
+      return -1;
+    }
+    archive_backup_close(&backup, 1);
+    backup_started = 0;
+    snprintf(info->app_path, sizeof(info->app_path), "%s",
+             info->prepared_path);
+    info->path_ok = 1;
+    info->permissions_ok = 1;
+    info->target_exists = 1;
+    info->merge_required = 0;
+  }
+  if(!info->path_ok) {
+    job_set_current("Placing app folder");
+    if(lstat(info->prepared_path, &st) == 0) {
+      if(!S_ISDIR(st.st_mode)) {
+        snprintf(err, err_size, "prepared app target is not a folder");
+        errno = ENOTDIR;
+        return -1;
+      }
+      if(archive_backup_begin(&backup, info->prepared_path,
+                              path_basename(info->scan_path),
+                              err, err_size) != 0) {
+        return -1;
+      }
+      backup_started = 1;
+      if(archive_merge_move_tree(info->app_path, info->prepared_path, "",
+                                 &backup, err, err_size) != 0) {
+        if(!err[0]) {
+          snprintf(err, err_size, "merge app folder: %s",
+                   job_cancelled() ? "cancelled" : strerror(errno));
+        }
+        archive_backup_close(&backup, 0);
+        return -1;
+      }
+      archive_backup_close(&backup, 1);
+      backup_started = 0;
+    }
+    else {
+      if(errno != ENOENT) {
+        snprintf(err, err_size, "prepared path: %s", strerror(errno));
+        return -1;
+      }
+      if(archive_mkdir_parent(info->prepared_path) != 0) {
+        snprintf(err, err_size, "prepared parent: %s", strerror(errno));
+        return -1;
+      }
+      if(rename(info->app_path, info->prepared_path) != 0) {
+        snprintf(err, err_size, "place app folder: %s", strerror(errno));
+        return -1;
+      }
+    }
+    snprintf(info->app_path, sizeof(info->app_path), "%s", info->prepared_path);
+    info->path_ok = 1;
+  }
+
+  if(!info->patch_mode) {
+    job_set_current("Setting permissions");
+    if(archive_chmod_777_recursive(info->prepared_path, archive_job_cancel_cb,
+                                   NULL, NULL, NULL, NULL, err,
+                                   err_size) != 0) {
+      return -1;
+    }
+  }
+  if(cleanup_extras) {
+    job_set_current("Cleaning extracted files");
+    if(rar_delete_tree(info->scan_path) != 0) {
+      snprintf(err, err_size, "cleanup extracted files: %s",
+               strerror(errno));
+      return -1;
+    }
+  }
+  if(backup_started) archive_backup_close(&backup, 0);
+  if(info->patch_mode) {
+    info->found = 1;
+    info->prepared = 1;
+    info->permissions_ok = 1;
+    info->path_ok = 1;
+    info->target_exists = 1;
+    info->merge_required = 0;
+    info->delete_extra_files = 0;
+    info->delete_extra_dirs = 0;
+    info->delete_extra_sample[0] = 0;
+    snprintf(info->reason, sizeof(info->reason), "patch applied");
+    return 0;
+  }
+  return archive_app_prepare_probe(info->prepared_path, info, err, err_size);
 }
 
 

@@ -79,13 +79,6 @@ static zip_pipe_t *g_archive_upload_pipe = NULL;
 static int g_archive_upload_fd = -1;
 
 
-static int
-zip_job_cancel_cb(void *opaque) {
-  (void)opaque;
-  return job_cancelled();
-}
-
-
 static uint16_t
 zip_le16(const unsigned char *p) {
   return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
@@ -1160,6 +1153,8 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
   char final_base[1024];
   char lease_err[160] = {0};
   char backup_err[200] = {0};
+  char defer_arg[16] = {0};
+  char log_name[256] = {0};
   archive_backup_ctx_t backup;
   activity_request_ctx_t activity = {0};
   int total_files = 0;
@@ -1168,6 +1163,8 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
   int final_existed = 0;
   int backup_started = 0;
   int content_complete = 0;
+  int defer_activity = 0;
+  int activity_deferred = 0;
   pthread_t producer;
   int producer_started = 0;
 
@@ -1211,6 +1208,11 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
     return serve_error(req, 400, "bad extract prefix");
   }
   parse_upload_int_arg(req, "files", &total_files);
+  if(websrv_get_query_arg(req, "deferActivity", defer_arg,
+                          sizeof(defer_arg)) &&
+     strcmp(defer_arg, "0") != 0) {
+    defer_activity = 1;
+  }
 
   if(zip_build_base_path(&opts, final_base, sizeof(final_base)) != 0) {
     drain_body(req->fd, initial_size, content_size);
@@ -1311,14 +1313,6 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
   }
   if(rc == 0) {
     content_complete = 1;
-    job_set_current("Setting permissions");
-    char chmod_err[160] = {0};
-    if(archive_chmod_777_recursive(final_base, zip_job_cancel_cb, NULL,
-                                   NULL, NULL, NULL, chmod_err,
-                                   sizeof(chmod_err)) != 0) {
-      zip_stream_error(&zs, "%s", chmod_err[0] ? chmod_err : "chmod failed");
-      rc = -1;
-    }
   }
   if(rc != 0) {
     zip_pipe_cancel(&pipe);
@@ -1327,17 +1321,23 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
   if(producer_started) pthread_join(producer, NULL);
   if(backup_started) archive_backup_close(&backup, content_complete);
   job_end(rc, rc == 0 ? NULL : (zs.err[0] ? zs.err : "zip upload failed"));
+  job_log_name(log_name, sizeof(log_name));
   if(activity.queued) {
-    char log_name[256];
-    job_log_name(log_name, sizeof(log_name));
-    activity_finish_queue(activity.queue_id, rc,
-                          rc == 0 ? NULL : (zs.err[0] ? zs.err : "zip upload failed"),
-                          final_base,
-                          rc == 0 ? zip_job_long((uint64_t)content_size)
-                                  : atomic_load(&g_job.copied_bytes),
-                          extracted_files,
-                          rc == 0 ? 0 : 1,
-                          log_name);
+    if(rc == 0 && defer_activity) {
+      activity_deferred = 1;
+      activity_defer_queue_success(activity.queue_id, final_base,
+                                   zip_job_long((uint64_t)content_size),
+                                   extracted_files, log_name);
+    } else {
+      activity_finish_queue(activity.queue_id, rc,
+                            rc == 0 ? NULL : (zs.err[0] ? zs.err : "zip upload failed"),
+                            final_base,
+                            rc == 0 ? zip_job_long((uint64_t)content_size)
+                                    : atomic_load(&g_job.copied_bytes),
+                            extracted_files,
+                            rc == 0 ? 0 : 1,
+                            log_name);
+    }
   }
   zip_stream_free(&zs);
   zip_pipe_destroy(&pipe);
@@ -1350,7 +1350,10 @@ transfer_upload_zip_request(const http_request_t *req, const char *initial_data,
   json_buf_t b = {0};
   if(json_append(&b, "{\"ok\":true,\"path\":") != 0 ||
      json_string(&b, final_base) != 0 ||
-     json_appendf(&b, ",\"files\":%d}", extracted_files) != 0) {
+     json_appendf(&b, ",\"files\":%d,\"activityDeferred\":%s,\"logName\":",
+                  extracted_files, activity_deferred ? "true" : "false") != 0 ||
+     json_string(&b, log_name) != 0 ||
+     json_append(&b, "}") != 0) {
     free(b.data);
     return -1;
   }

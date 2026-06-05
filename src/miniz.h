@@ -2,7 +2,6 @@
 
 #define MINIZ_NO_STDIO
 #define MINIZ_NO_TIME
-#define MINIZ_NO_DEFLATE_APIS
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ARCHIVE_WRITING_APIS
 #define MINIZ_NO_ZLIB_APIS
@@ -41,4 +40,32 @@
 #endif
 
 #include "miniz_common.h"
+#include "miniz_tdef.h"
 #include "miniz_tinfl.h"
+
+typedef unsigned long mz_ulong;
+
+#define MZ_ADLER32_INIT (1)
+#define MZ_CRC32_INIT (0)
+
+enum {
+    MZ_DEFAULT_STRATEGY = 0,
+    MZ_FILTERED = 1,
+    MZ_HUFFMAN_ONLY = 2,
+    MZ_RLE = 3,
+    MZ_FIXED = 4
+};
+
+enum {
+    MZ_NO_COMPRESSION = 0,
+    MZ_BEST_SPEED = 1,
+    MZ_BEST_COMPRESSION = 9,
+    MZ_UBER_COMPRESSION = 10,
+    MZ_DEFAULT_LEVEL = 6,
+    MZ_DEFAULT_COMPRESSION = -1
+};
+
+MINIZ_EXPORT mz_ulong mz_adler32(mz_ulong adler, const unsigned char *ptr,
+                                 size_t buf_len);
+MINIZ_EXPORT mz_ulong mz_crc32(mz_ulong crc, const unsigned char *ptr,
+                               size_t buf_len);

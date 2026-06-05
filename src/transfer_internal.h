@@ -45,6 +45,13 @@ struct job_state {
   atomic_int      cancel;
   atomic_long     total_bytes;
   atomic_long     copied_bytes;
+  atomic_long     compressed_output_bytes;
+  atomic_long     raw_blocks;
+  atomic_long     compressed_blocks;
+  atomic_long     skipped_zlib_blocks;
+  atomic_long     total_blocks;
+  atomic_long     writer_wait_us;
+  atomic_long     worker_wait_us;
   atomic_int      total_files;
   atomic_int      done_files;
   atomic_int      failed_files;
@@ -94,3 +101,6 @@ void activity_finish_queue(const char *queue_id, int rc, const char *err,
                            const char *target, long copied_bytes,
                            int done_items, int failed_items,
                            const char *log_name);
+void activity_defer_queue_success(const char *queue_id, const char *target,
+                                  long copied_bytes, int done_items,
+                                  const char *log_name);
